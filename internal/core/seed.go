@@ -44,15 +44,19 @@ func seedMenus(db *gorm.DB) {
 		{Name: "部门管理", ParentID: 1, Type: "C", Path: "dept", Component: "system/dept", Permission: "system:dept:list", Icon: "OfficeBuilding", Sort: 4, Visible: 1, Status: 1},
 		{Name: "插件管理", ParentID: 1, Type: "C", Path: "plugin", Component: "system/plugin", Permission: "system:plugin:list", Icon: "Box", Sort: 5, Visible: 1, Status: 1},
 		{Name: "日志管理", ParentID: 1, Type: "C", Path: "log", Component: "system/log", Permission: "system:log:list", Icon: "Document", Sort: 6, Visible: 1, Status: 1},
-		{Name: "系统设置", ParentID: 1, Type: "C", Path: "setting", Component: "system/setting", Permission: "system:setting:list", Icon: "Tools", Sort: 7, Visible: 1, Status: 1},
+		{Name: "系统设置", ParentID: 1, Type: "C", Path: "settings", Component: "system/settings", Permission: "system:setting:list", Icon: "Tools", Sort: 7, Visible: 1, Status: 1},
 		// MCP 管理
 		{Name: "MCP 管理", ParentID: 0, Type: "M", Path: "/mcp", Icon: "Connection", Sort: 2, Visible: 1, Status: 1},
-		{Name: "工具管理", ParentID: 9, Type: "C", Path: "tool", Component: "mcp/tool", Permission: "mcp:tools:list", Icon: "Tools", Sort: 1, Visible: 1, Status: 1},
+		{Name: "工具管理", ParentID: 9, Type: "C", Path: "tools", Component: "mcp/tools", Permission: "mcp:tools:list", Icon: "Tools", Sort: 1, Visible: 1, Status: 1},
+		{Name: "资源管理", ParentID: 9, Type: "C", Path: "resources", Component: "mcp/resources", Permission: "mcp:resources:list", Icon: "FolderOpened", Sort: 2, Visible: 1, Status: 1},
+		{Name: "提示词管理", ParentID: 9, Type: "C", Path: "prompts", Component: "mcp/prompts", Permission: "mcp:prompts:list", Icon: "ChatLineSquare", Sort: 3, Visible: 1, Status: 1},
+		{Name: "审计日志", ParentID: 9, Type: "C", Path: "audit-logs", Component: "mcp/audit-logs", Permission: "mcp:audit:list", Icon: "Document", Sort: 4, Visible: 1, Status: 1},
 		// AI 对话
 		{Name: "AI 对话", ParentID: 0, Type: "M", Path: "/ai", Icon: "ChatDotRound", Sort: 3, Visible: 1, Status: 1},
-		{Name: "对话助手", ParentID: 11, Type: "C", Path: "chat", Component: "ai/chat", Permission: "ai:chat", Icon: "ChatLineRound", Sort: 1, Visible: 1, Status: 1},
-		// 仪表盘
-		{Name: "仪表盘", ParentID: 0, Type: "C", Path: "/dashboard", Component: "dashboard/index", Permission: "dashboard:view", Icon: "Odometer", Sort: 0, Visible: 1, Status: 1},
+		{Name: "对话助手", ParentID: 14, Type: "C", Path: "chat", Component: "ai/chat", Permission: "ai:chat", Icon: "ChatLineRound", Sort: 1, Visible: 1, Status: 1},
+		{Name: "模型密钥管理", ParentID: 14, Type: "C", Path: "providers", Component: "ai/providers", Permission: "ai:provider:list", Icon: "Key", Sort: 2, Visible: 1, Status: 1},
+		// 仪表盘（前端硬编码跳转 /dashboard-monitor，component 对应 apeui/dashboard/Monitor.vue）
+		{Name: "仪表盘", ParentID: 0, Type: "C", Path: "dashboard-monitor", Component: "apeui/dashboard/Monitor", Permission: "dashboard:view", Icon: "Odometer", Sort: 0, Visible: 1, Status: 1},
 	}
 
 	// 用户管理按钮权限
@@ -128,7 +132,7 @@ func seedRoles(db *gorm.DB) {
 
 	// 访客角色
 	viewerMenus := []model.SysMenu{}
-	db.Where("path = ?", "dashboard/index").Find(&viewerMenus)
+	db.Where("path = ?", "dashboard-monitor").Find(&viewerMenus)
 	viewerRole := model.SysRole{
 		Name:      "访客",
 		Code:      "viewer",
@@ -186,7 +190,7 @@ func seedSettings(db *gorm.DB) {
 	settings := []model.SysSetting{
 		{Key: "site_name", Value: "GinApeAdmin", IsPublic: true},
 		{Key: "logo_url", Value: "", IsPublic: true},
-		{Key: "primary_color", Value: "#0E7C7B", IsPublic: true},
+		{Key: "primary_color", Value: "#5A67F5", IsPublic: true},
 	}
 	for _, s := range settings {
 		db.Create(&s)

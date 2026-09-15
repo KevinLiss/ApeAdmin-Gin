@@ -35,6 +35,8 @@ type SysAiProvider struct {
 	BaseURL      string  `gorm:"size:255" json:"base_url"`
 	Models       *string `gorm:"type:text" json:"models"`
 	ApiKeyEnc    string  `gorm:"size:500" json:"-"`
+	Sort         int     `gorm:"default:0" json:"sort"`
+	Remark       string  `gorm:"size:200" json:"remark"`
 	Enabled      bool    `gorm:"default:true" json:"enabled"`
 }
 
@@ -54,9 +56,10 @@ func (SysChatSession) TableName() string { return "sys_chat_session" }
 // SysChatMessage 对话消息
 type SysChatMessage struct {
 	BaseLogModel
-	SessionID uint   `gorm:"index;not null" json:"session_id"`
-	Role      string `gorm:"size:20;not null" json:"role"`
-	Content   string `gorm:"type:text" json:"content"`
+	SessionID  uint   `gorm:"index;not null" json:"session_id"`
+	Role       string `gorm:"size:20;not null" json:"role"`
+	Content    string `gorm:"type:text" json:"content"`
+	ToolEvents string `gorm:"type:text" json:"tool_events"`
 }
 
 func (SysChatMessage) TableName() string { return "sys_chat_message" }

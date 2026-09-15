@@ -84,7 +84,9 @@ func Run(configPath string) error {
 
 	// 10. MCP 管理器
 	mcpMgr := mcp.NewManager(db)
+	mcpMgr.SetConfig(cfg)
 	core.SetMCPManager(mcpMgr)
+	mcp.RegisterBuiltin(mcpMgr)
 
 	// 11. 插件管理器
 	pluginMgr := plugin.NewManager(db, cfg)

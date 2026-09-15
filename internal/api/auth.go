@@ -40,6 +40,43 @@ func (h *AuthHandler) GetUserInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success(info))
 }
 
+// GetProfile 获取个人中心完整信息
+func (h *AuthHandler) GetProfile(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	user, err := dal.GetUserWithRoles(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, response.Error(404, "用户不存在"))
+		return
+	}
+	roles := make([]map[string]interface{}, 0, len(user.Roles))
+	for _, r := range user.Roles {
+		roles = append(roles, map[string]interface{}{"id": r.ID, "name": r.Name, "code": r.Code})
+	}
+	var dept map[string]interface{}
+	if user.Dept != nil {
+		dept = map[string]interface{}{"id": user.Dept.ID, "name": user.Dept.Name}
+	}
+	var lastLogin string
+	if user.LastLoginAt != nil {
+		lastLogin = user.LastLoginAt.Format(time.RFC3339)
+	}
+	c.JSON(http.StatusOK, response.Success(map[string]interface{}{
+		"id":            user.ID,
+		"username":      user.Username,
+		"nickname":      user.Nickname,
+		"email":         user.Email,
+		"phone":         user.Phone,
+		"avatar":        user.Avatar,
+		"dept_id":       user.DeptID,
+		"dept":          dept,
+		"roles":         roles,
+		"status":        user.Status,
+		"last_login_at": lastLogin,
+		"last_login_ip": user.LastLoginIP,
+		"created_at":    user.CreatedAt.Format(time.RFC3339),
+	}))
+}
+
 // UpdateProfile 更新个人资料
 func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	userID := c.GetUint("user_id")

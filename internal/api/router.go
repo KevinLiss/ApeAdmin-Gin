@@ -42,6 +42,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
 	{
 		auth := authed.Group("/auth")
 		auth.GET("/userinfo", (&AuthHandler{}).GetUserInfo)
+		auth.GET("/profile", (&AuthHandler{}).GetProfile)
 		auth.PUT("/profile", (&AuthHandler{}).UpdateProfile)
 		auth.PUT("/profile/password", (&AuthHandler{}).ChangePassword)
 		auth.POST("/logout", (&AuthHandler{}).Logout)
@@ -113,6 +114,46 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
 		settings.GET("", middleware.RequirePermission("system:setting:list"), setH.List)
 		settings.PUT("", middleware.RequirePermission("system:setting:edit"), setH.BatchUpdate)
 		settings.PUT("/:key", middleware.RequirePermission("system:setting:edit"), setH.Update)
+
+		// 仪表盘
+		dashboard := perm.Group("/dashboard")
+		dashH := &DashboardHandler{}
+		dashboard.GET("/system", middleware.RequirePermission("dashboard:view"), dashH.System)
+		dashboard.GET("/stats", middleware.RequirePermission("dashboard:view"), dashH.Stats)
+
+		// MCP 管理
+		mcpGroup := perm.Group("/mcp")
+		mcpH := &McpHandler{}
+		mcpGroup.GET("/tools", middleware.RequirePermission("mcp:tools:list"), mcpH.Tools)
+		mcpGroup.GET("/tools/categories", middleware.RequirePermission("mcp:tools:list"), mcpH.ToolCategories)
+		mcpGroup.POST("/tools/call", middleware.RequirePermission("mcp:tools:call"), mcpH.ToolCall)
+		mcpGroup.GET("/resources", middleware.RequirePermission("mcp:resources:list"), mcpH.Resources)
+		mcpGroup.GET("/resources/read", middleware.RequirePermission("mcp:resources:list"), mcpH.ResourceRead)
+		mcpGroup.GET("/prompts", middleware.RequirePermission("mcp:prompts:list"), mcpH.Prompts)
+		mcpGroup.POST("/prompts/render", middleware.RequirePermission("mcp:prompts:list"), mcpH.PromptRender)
+		mcpGroup.GET("/audit-logs", middleware.RequirePermission("mcp:audit:list"), mcpH.AuditLogs)
+
+		// AI 供应商管理
+		ai := perm.Group("/ai")
+		aiH := &AiHandler{}
+		ai.GET("/providers", middleware.RequirePermission("ai:provider:list"), aiH.ListProviders)
+		ai.POST("/providers", middleware.RequirePermission("ai:provider:add"), aiH.CreateProvider)
+		ai.GET("/providers/all", middleware.RequirePermission("ai:provider:list"), aiH.ListAllProviders)
+		ai.PUT("/providers/:id", middleware.RequirePermission("ai:provider:edit"), aiH.UpdateProvider)
+		ai.DELETE("/providers/:id", middleware.RequirePermission("ai:provider:delete"), aiH.DeleteProvider)
+		ai.POST("/providers/:id/test", middleware.RequirePermission("ai:provider:list"), aiH.TestProvider)
+
+		// AI 对话
+		ai.POST("/chat", middleware.RequirePermission("ai:chat"), aiH.Chat)
+		ai.POST("/chat/stream", middleware.RequirePermission("ai:chat"), aiH.ChatStream)
+
+		// AI 会话持久化
+		ai.GET("/sessions", middleware.RequirePermission("ai:chat"), aiH.ListSessions)
+		ai.POST("/sessions", middleware.RequirePermission("ai:chat"), aiH.CreateSession)
+		ai.GET("/sessions/:id", middleware.RequirePermission("ai:chat"), aiH.GetSessionMessages)
+		ai.PUT("/sessions/:id", middleware.RequirePermission("ai:chat"), aiH.RenameSession)
+		ai.DELETE("/sessions/:id", middleware.RequirePermission("ai:chat"), aiH.DeleteSession)
+		ai.POST("/sessions/:id/messages", middleware.RequirePermission("ai:chat"), aiH.AppendMessage)
 	}
 
 	// SPA 静态文件服务
