@@ -29,6 +29,8 @@ type AppConfig struct {
 	Debug     bool   `mapstructure:"debug"`
 	APIPrefix string `mapstructure:"api_prefix"`
 	AdminPath string `mapstructure:"admin_path"`
+	SPADir    string `mapstructure:"spa_dir"`
+	Port      int    `mapstructure:"port"`
 }
 
 type DatabaseConfig struct {

@@ -3,10 +3,12 @@
 
 app:
   name: "GinApeAdmin"
-  version: "0.1.0"
+  version: "0.2.0"
   debug: true
   api_prefix: "/api/v1"
   admin_path: "/admin"
+  spa_dir: "frontend/dist"      # 前端构建产物目录（SPA 静态服务）
+  port: 8001                    # HTTP 监听端口
 
 database:
   type: sqlite              # sqlite | mysql

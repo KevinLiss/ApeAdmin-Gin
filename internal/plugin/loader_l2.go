@@ -29,20 +29,20 @@ func LoadL2Plugin(zipPath string, cfg LoaderConfig) (*Manifest, error) {
 		return nil, fmt.Errorf("插件 %s 已存在，请先卸载旧版本", manifest.Name)
 	}
 
-	// 3. 解压到隔离目录
-	stagingDir := filepath.Join(cfg.UploadDir, "_staging", manifest.Name+"-"+sha8(zipPath))
-	if err := os.MkdirAll(stagingDir, 0755); err != nil {
-		return nil, fmt.Errorf("创建隔离目录失败: %w", err)
+	// 3. 最终目录（直接解压到此，避免 rename 后 DB 路径不一致）
+	finalDir := filepath.Join(cfg.UploadDir, manifest.Name+"-"+manifest.Version)
+	_ = os.RemoveAll(finalDir) // 如果旧版本目录存在先删除
+	if err := os.MkdirAll(finalDir, 0755); err != nil {
+		return nil, fmt.Errorf("创建插件目录失败: %w", err)
 	}
-	if err := extractZip(zipPath, stagingDir); err != nil {
-		os.RemoveAll(stagingDir)
+	if err := extractZip(zipPath, finalDir); err != nil {
+		os.RemoveAll(finalDir)
 		return nil, fmt.Errorf("解压失败: %w", err)
 	}
 
-	// 4. 注入 DB（单事务）
+	// 4. 注入 DB（单事务，失败则清理文件）
 	db := dal.GetDB()
 	err = db.Transaction(func(tx *gorm.DB) error {
-		// sys_plugin
 		pluginRecord := model.SysPlugin{
 			Name:        manifest.Name,
 			DisplayName: manifest.DisplayName,
@@ -50,7 +50,7 @@ func LoadL2Plugin(zipPath string, cfg LoaderConfig) (*Manifest, error) {
 			Version:     manifest.Version,
 			Author:      manifest.Author,
 			Enabled:     false,
-			ModulePath:  stagingDir,
+			ModulePath:  finalDir,
 		}
 		if err := tx.Create(&pluginRecord).Error; err != nil {
 			return fmt.Errorf("写入插件记录失败: %w", err)
@@ -58,16 +58,15 @@ func LoadL2Plugin(zipPath string, cfg LoaderConfig) (*Manifest, error) {
 
 		// 注入菜单（如果 ZIP 包含 menu.json）
 		if containsFile(entries, "menu.json") {
-			menuPath := filepath.Join(stagingDir, "menu.json")
+			menuPath := filepath.Join(finalDir, "menu.json")
 			if err := injectMenus(tx, menuPath); err != nil {
 				return fmt.Errorf("注入菜单失败: %w", err)
 			}
 		}
 
-		// 注入权限（菜单的 permission 字段自动注册）
 		// 注入预置数据（如果 ZIP 包含 seed.sql）
 		if containsFile(entries, "seed.sql") {
-			seedPath := filepath.Join(stagingDir, "seed.sql")
+			seedPath := filepath.Join(finalDir, "seed.sql")
 			if err := injectSeedSQL(tx, seedPath); err != nil {
 				return fmt.Errorf("预置数据失败: %w", err)
 			}
@@ -76,16 +75,8 @@ func LoadL2Plugin(zipPath string, cfg LoaderConfig) (*Manifest, error) {
 		return nil
 	})
 	if err != nil {
-		os.RemoveAll(stagingDir)
+		os.RemoveAll(finalDir)
 		return nil, err
-	}
-
-	// 5. 原子移动到正式目录
-	finalDir := filepath.Join(cfg.UploadDir, manifest.Name+"-"+manifest.Version)
-	_ = os.RemoveAll(finalDir) // 如果旧目录存在先删除
-	if err := os.Rename(stagingDir, finalDir); err != nil {
-		// rename 失败不回滚 DB（插件记录仍在，目录可手动修复）
-		return manifest, nil
 	}
 
 	return manifest, nil

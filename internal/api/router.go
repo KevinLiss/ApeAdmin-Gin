@@ -2,6 +2,9 @@ package api
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -112,11 +115,34 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
 		settings.PUT("/:key", middleware.RequirePermission("system:setting:edit"), setH.Update)
 	}
 
-	// SPA 静态文件
-	r.NoRoute(func(c *gin.Context) {
-		c.JSON(http.StatusOK, response.Success(gin.H{
-			"message": "GinApeAdmin API Server",
-			"version": cfg.App.Version,
-		}))
-	})
+	// SPA 静态文件服务
+	if cfg.App.SPADir != "" {
+		if _, err := os.Stat(cfg.App.SPADir); err == nil {
+			r.Static("/assets", filepath.Join(cfg.App.SPADir, "assets"))
+			r.StaticFile("/favicon.ico", filepath.Join(cfg.App.SPADir, "favicon.ico"))
+			// SPA fallback：非 API 路径返回 index.html
+			r.NoRoute(func(c *gin.Context) {
+				if strings.HasPrefix(c.Request.URL.Path, cfg.App.APIPrefix) ||
+					strings.HasPrefix(c.Request.URL.Path, "/health") {
+					c.JSON(http.StatusNotFound, response.Error(404, "接口不存在"))
+					return
+				}
+				c.File(filepath.Join(cfg.App.SPADir, "index.html"))
+			})
+		} else {
+			r.NoRoute(func(c *gin.Context) {
+				c.JSON(http.StatusOK, response.Success(gin.H{
+					"message": "GinApeAdmin API Server",
+					"version": cfg.App.Version,
+				}))
+			})
+		}
+	} else {
+		r.NoRoute(func(c *gin.Context) {
+			c.JSON(http.StatusOK, response.Success(gin.H{
+				"message": "GinApeAdmin API Server",
+				"version": cfg.App.Version,
+			}))
+		})
+	}
 }

@@ -2,7 +2,9 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"sync"
+	"syscall"
 
 	"gin-apeadmin/internal/config"
 	"gin-apeadmin/internal/mcp"
@@ -136,4 +138,21 @@ func MustGetDB() *gorm.DB {
 		panic(fmt.Sprintf("Container DB not initialized; call SetDB first"))
 	}
 	return db
+}
+
+// ─── 优雅关闭请求（由 Restart API 等触发）───
+
+var shutdownCh chan os.Signal
+
+// SetShutdownCh 注册优雅关闭通道（bootstrap 启动时调用）
+func SetShutdownCh(ch chan os.Signal) { shutdownCh = ch }
+
+// RequestShutdown 请求优雅关闭（非阻塞）
+func RequestShutdown() {
+	if shutdownCh != nil {
+		select {
+		case shutdownCh <- syscall.SIGTERM:
+		default:
+		}
+	}
 }

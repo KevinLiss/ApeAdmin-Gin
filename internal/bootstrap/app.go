@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -107,33 +108,36 @@ func Run(configPath string) error {
 	pluginMgr.EmitEvent(plugin.EventAppStartup, nil)
 
 	// 15. 启动 HTTP（优雅关闭）
-	return runServer(r, &shutdownCtx{
+	return runServer(r, cfg.App.Port, &shutdownCtx{
 		pluginMgr:  pluginMgr,
 		db:         db,
 		auditQueue: auditQueue,
 	})
 }
 
+// shutdownCtx 优雅关闭依赖
 type shutdownCtx struct {
 	pluginMgr  *plugin.Manager
 	db         *gorm.DB
 	auditQueue *core.AuditQueue
 }
 
-func runServer(r *gin.Engine, deps *shutdownCtx) error {
+func runServer(r *gin.Engine, port int, deps *shutdownCtx) error {
+	addr := fmt.Sprintf(":%d", port)
 	srv := &http.Server{
-		Addr:    ":8001",
+		Addr:    addr,
 		Handler: r,
 	}
 
 	go func() {
-		log.Printf("服务器启动: http://localhost:8001")
+		log.Printf("服务器启动: http://localhost:%d", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("启动失败: %v", err)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
+	core.SetShutdownCh(quit)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("正在关闭服务器...")

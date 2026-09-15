@@ -1,12 +1,20 @@
 package api
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"gin-apeadmin/internal/core"
 	"gin-apeadmin/internal/dal"
 	"gin-apeadmin/internal/pkg/response"
+	"gin-apeadmin/internal/plugin"
 )
 
 // PluginHandler 插件管理 API
@@ -86,34 +94,91 @@ func (h *PluginHandler) UpdateConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, response.SuccessMsg("配置已保存"))
 }
 
-// Upload 上传 ZIP 插件包
+// Upload 上传 ZIP 插件包（L2 声明式清单插件）
 func (h *PluginHandler) Upload(c *gin.Context) {
-	// 插件上传逻辑在 plugin/loader_l2.go 中实现
-	// 此处为占位，实际调用 plugin.HandleUpload
-	c.JSON(http.StatusNotImplemented, response.Error(501, "插件上传功能正在开发中"))
+	cfg := core.GetConfig()
+	if cfg == nil || !cfg.Plugin.Enabled {
+		c.JSON(http.StatusBadRequest, response.Error(400, "插件功能未启用"))
+		return
+	}
+
+	// 1. 接收 multipart 文件
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(400, "缺少文件字段 file"))
+		return
+	}
+
+	// 2. 扩展名校验
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext != ".zip" {
+		c.JSON(http.StatusBadRequest, response.Error(400, "仅支持 .zip 格式插件包"))
+		return
+	}
+
+	// 3. 保存到临时目录
+	tmpDir := filepath.Join(cfg.Plugin.UploadDir, "_tmp")
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(500, "创建临时目录失败"))
+		return
+	}
+	tmpPath := filepath.Join(tmpDir, fmt.Sprintf("%d-%s", time.Now().UnixNano(), file.Filename))
+	if err := c.SaveUploadedFile(file, tmpPath); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(500, "保存上传文件失败"))
+		return
+	}
+	defer os.Remove(tmpPath) // 无论成功失败都清理临时文件
+
+	// 4. 调用 L2 加载器
+	manifest, err := plugin.LoadL2Plugin(tmpPath, plugin.LoaderConfig{
+		UploadDir: cfg.Plugin.UploadDir,
+		ZipGuard:  cfg.Plugin.ZipGuard,
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(400, err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success(gin.H{
+		"refresh":      true,
+		"name":         manifest.Name,
+		"version":      manifest.Version,
+		"display_name": manifest.DisplayName,
+	}))
 }
 
-// Restart 重启后端
+// Restart 重启后端（触发优雅关闭，由外部守护进程拉起）
 func (h *PluginHandler) Restart(c *gin.Context) {
-	// 一期不实现重启，返回提示
+	core.RequestShutdown()
 	c.JSON(http.StatusOK, response.Success(gin.H{
-		"message": "重启功能将在后续版本实现",
+		"message": "服务正在重启...",
 	}))
 }
 
 // Delete 删除插件
 func (h *PluginHandler) Delete(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	plugin, err := dal.GetPluginByID(uint(id))
+	pluginRec, err := dal.GetPluginByID(uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, response.Error(404, "插件不存在"))
 		return
 	}
-	// 删除插件目录（如果存在）
-	_ = plugin
+
+	// 记录文件路径后先删 DB 记录，再清理文件（文件清理失败仅记日志，不影响 DB）
+	modulePath := pluginRec.ModulePath
 	if err := dal.DeletePlugin(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error(500, "删除失败"))
 		return
 	}
+
+	// 清理插件文件目录（ModulePath 或 uploads/plugins 下的插件目录）
+	if modulePath != "" {
+		if _, statErr := os.Stat(modulePath); statErr == nil {
+			if rmErr := os.RemoveAll(modulePath); rmErr != nil {
+				log.Printf("[plugin] 删除插件目录失败: %v (path=%s)", rmErr, modulePath)
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, response.Success(gin.H{"refresh": true}))
 }
