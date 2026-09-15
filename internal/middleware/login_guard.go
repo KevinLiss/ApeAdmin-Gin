@@ -1,7 +1,11 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,15 +31,22 @@ func LoginGuard() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cfg := core.GetConfig().Security.LoginGuard
 		ip := c.ClientIP()
-		username := c.PostForm("username")
-		if username == "" {
-			// 尝试从 JSON body 读取
+
+		// 读取原始 body 并完整恢复，避免影响后续 handler 解析
+		var username string
+		bodyBytes, _ := io.ReadAll(c.Request.Body)
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		// JSON 请求：从 body 解析 username；表单请求：走 PostForm
+		if ct := c.ContentType(); ct != "" && !strings.HasPrefix(ct, "application/x-www-form-urlencoded") && !strings.HasPrefix(ct, "multipart/form-data") {
 			var body map[string]interface{}
-			if err := c.ShouldBindJSON(&body); err == nil {
+			if err := json.Unmarshal(bodyBytes, &body); err == nil {
 				if u, ok := body["username"].(string); ok {
 					username = u
 				}
 			}
+		} else {
+			username = c.PostForm("username")
 		}
 
 		key := ip + "|" + username
