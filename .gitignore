@@ -1,0 +1,49 @@
+﻿# 调研内容（不提交到仓库）
+analysis/
+.temp/
+.workbuddy/
+
+# 调研/设计文档（仅本地保留）
+Gin后台框架架构调研对比报告.docx
+Gin-ApeAdmin后端架构设计方案.docx
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志
+logs/
+*.log
+
+# 上传文件（运行时生成）
+uploads/plugins/*
+uploads/files/*
+!uploads/plugins/.gitkeep
+!uploads/files/.gitkeep
+
+# 数据库文件（SQLite 本地开发）
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 前端（复用 apeadmin，按需处理）
+frontend/
