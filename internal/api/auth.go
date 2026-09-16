@@ -89,7 +89,43 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, response.Error(500, "更新失败"))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+	// 返回更新后的用户信息，前端需用返回值同步 profile 和 Pinia store
+	user, err := dal.GetUserWithRoles(userID)
+	if err != nil {
+		c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+		return
+	}
+	roles := make([]map[string]interface{}, 0, len(user.Roles))
+	for _, r := range user.Roles {
+		roles = append(roles, map[string]interface{}{"id": r.ID, "name": r.Name, "code": r.Code})
+	}
+	var dept map[string]interface{}
+	if user.Dept != nil {
+		dept = map[string]interface{}{"id": user.Dept.ID, "name": user.Dept.Name}
+	}
+	var lastLogin string
+	if user.LastLoginAt != nil {
+		lastLogin = user.LastLoginAt.Format(time.RFC3339)
+	}
+	avatar := ""
+	if user.Avatar != nil {
+		avatar = *user.Avatar
+	}
+	c.JSON(http.StatusOK, response.Success(map[string]interface{}{
+		"id":            user.ID,
+		"username":      user.Username,
+		"nickname":      user.Nickname,
+		"email":         user.Email,
+		"phone":         user.Phone,
+		"avatar":        avatar,
+		"dept_id":       user.DeptID,
+		"dept":          dept,
+		"roles":         roles,
+		"status":        user.Status,
+		"last_login_at": lastLogin,
+		"last_login_ip": user.LastLoginIP,
+		"created_at":    user.CreatedAt.Format(time.RFC3339),
+	}))
 }
 
 // ChangePassword 修改密码
