@@ -65,12 +65,14 @@ func Run(configPath string) error {
 	// 4. 种子数据
 	core.SeedData(db, cfg.SuperAdmin)
 
-	// 5. 注入容器
+	// 4.5 注入容器（seedAiProvider 需要 JWT Secret 加密）
 	core.SetConfig(cfg)
 	core.SetDB(db)
 	core.SetLogger(logger)
+	core.SeedAiProvider(db)
 
-	// 6. TokenStore
+	// 5. （已在 4.5 注入容器）
+	// 6. TokenStore（步骤编号沿用）
 	tokenStore := core.NewMemoryTokenStore()
 	core.SetTokenStore(tokenStore)
 
