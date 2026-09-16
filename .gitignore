@@ -5,8 +5,8 @@ analysis/
 
 # 调研/设计文档（仅本地保留）
 Gin后台框架架构调研对比报告.docx
-Gin-ApeAdmin后端架构设计方案.docx
-/Gin-ApeAdmin v0.2.0开发计划.docx
+ApeAdmin-Gin后端架构设计方案.docx
+/ApeAdmin-Gin v0.2.0开发计划.docx
 
 # 根目录截图（其他项目误放，不入库）
 /*.png
