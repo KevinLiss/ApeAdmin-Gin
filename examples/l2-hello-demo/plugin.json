@@ -1,0 +1,8 @@
+{
+  "name": "demo-hello",
+  "version": "1.0.0",
+  "display_name": "演示插件",
+  "description": "L2 声明式插件示例，演示菜单注入 + 预置数据",
+  "author": "ApeAdmin Team",
+  "type": "l2"
+}

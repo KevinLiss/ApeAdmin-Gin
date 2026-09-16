@@ -1,0 +1,24 @@
+[
+  {
+    "name": "演示插件",
+    "parent_id": 0,
+    "type": "M",
+    "path": "demo",
+    "icon": "Star",
+    "sort": 99,
+    "visible": 1,
+    "status": 1
+  },
+  {
+    "name": "Hello 页面",
+    "parent_id": null,
+    "type": "C",
+    "path": "hello",
+    "component": "demo/hello/index",
+    "permission": "demo:hello:list",
+    "icon": "ChatLineSquare",
+    "sort": 1,
+    "visible": 1,
+    "status": 1
+  }
+]

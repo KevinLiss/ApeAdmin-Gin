@@ -13,8 +13,12 @@ import (
 	"gin-apeadmin/internal/pkg/response"
 )
 
+// PluginRouteRegistrar 插件路由注册回调
+// 由 bootstrap 注入，在所有系统路由注册完成后调用，让 L1 插件能注册自己的路由
+type PluginRouteRegistrar func(public, authed *gin.RouterGroup)
+
 // RegisterRoutes 注册全部路由
-func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
+func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRouteRegistrar) {
 	r.GET("/health", HealthCheck)
 
 	// 全局限流
@@ -154,6 +158,12 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config) {
 		ai.PUT("/sessions/:id", middleware.RequirePermission("ai:chat"), aiH.RenameSession)
 		ai.DELETE("/sessions/:id", middleware.RequirePermission("ai:chat"), aiH.DeleteSession)
 		ai.POST("/sessions/:id/messages", middleware.RequirePermission("ai:chat"), aiH.AppendMessage)
+	}
+
+	// ─── 插件路由注册 ───
+	// 在所有系统路由注册完成后，回调让 L1 插件注册自己的 HTTP 路由
+	if registerPlugins != nil {
+		registerPlugins(public, perm)
 	}
 
 	// SPA 静态文件服务

@@ -2,19 +2,24 @@ package plugin
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	"gin-apeadmin/internal/config"
+	"gin-apeadmin/internal/mcp"
+
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 // Manager 插件管理器
 type Manager struct {
-	db       *gorm.DB
-	cfg      *config.Config
-	plugins  map[string]Plugin
+	db        *gorm.DB
+	cfg       *config.Config
+	mcpMgr    *mcp.Manager
+	plugins   map[string]Plugin
 	pluginsMu sync.RWMutex
-	eventBus *EventBus
+	eventBus  *EventBus
 }
 
 // NewManager 创建插件管理器
@@ -27,20 +32,51 @@ func NewManager(db *gorm.DB, cfg *config.Config) *Manager {
 	}
 }
 
+// SetMCPManager 注入 MCP 管理器（bootstrap 在注册路由前调用）
+func (m *Manager) SetMCPManager(mcpMgr *mcp.Manager) {
+	m.mcpMgr = mcpMgr
+}
+
 // EventBus 返回事件总线
 func (m *Manager) EventBus() *EventBus {
 	return m.eventBus
 }
 
-// Discover 发现并加载所有内置插件
+// Discover 发现并加载所有内置（L1）插件
+// 流程：遍历全局注册表 → OnLoad → 注册到管理器 → 返回成功加载的插件列表
+// OnLoad 失败的插件会被跳过（不阻止其他插件加载），但仍然保留在 plugins map 中
 func (m *Manager) Discover() error {
 	for _, p := range GetRegistered() {
 		m.pluginsMu.Lock()
 		m.plugins[p.Name()] = p
 		m.pluginsMu.Unlock()
 		if err := p.OnLoad(); err != nil {
+			log.Printf("[plugin] OnLoad 失败 %s: %v（跳过）", p.Name(), err)
 			continue
 		}
+		log.Printf("[plugin] 已加载: %s v%s", p.Name(), p.Version())
+	}
+	return nil
+}
+
+// RegisterAll 为所有已加载的插件创建 PluginRouter 并调用 Register
+// 必须在路由注册之后调用（需要 public/authed RouterGroup）
+func (m *Manager) RegisterAll(public, authed *gin.RouterGroup) error {
+	m.pluginsMu.RLock()
+	defer m.pluginsMu.RUnlock()
+
+	for _, p := range m.plugins {
+		router := &PluginRouter{
+			Public: public,
+			Authed: authed,
+			MCP:    m.mcpMgr, // 可能为 nil（未注入 MCP 管理器时）
+			DB:     m.db,
+		}
+		if err := p.Register(router); err != nil {
+			log.Printf("[plugin] Register 失败 %s: %v（跳过）", p.Name(), err)
+			continue
+		}
+		log.Printf("[plugin] 已注册路由: %s", p.Name())
 	}
 	return nil
 }

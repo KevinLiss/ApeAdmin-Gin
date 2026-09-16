@@ -19,6 +19,9 @@ import (
 	"gin-apeadmin/internal/model"
 	"gin-apeadmin/internal/plugin"
 
+	// L1 内置插件（blank import，触发 init() 自注册）
+	_ "gin-apeadmin/internal/plugin/builtin/hello"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -90,6 +93,7 @@ func Run(configPath string) error {
 
 	// 11. 插件管理器
 	pluginMgr := plugin.NewManager(db, cfg)
+	pluginMgr.SetMCPManager(mcpMgr)
 	pluginMgr.Discover()
 
 	// 12. 创建 Gin 引擎
@@ -104,7 +108,9 @@ func Run(configPath string) error {
 	r.Use(middleware.OperationLog())
 
 	// 13. 注册路由
-	api.RegisterRoutes(r, cfg)
+	api.RegisterRoutes(r, cfg, func(public, authed *gin.RouterGroup) {
+		pluginMgr.RegisterAll(public, authed)
+	})
 
 	// 14. 启动事件
 	pluginMgr.EmitEvent(plugin.EventAppStartup, nil)
