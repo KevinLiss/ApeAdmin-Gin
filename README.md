@@ -1,13 +1,3 @@
----
-AIGC:
-  ContentProducer: '001191110102MAD55U9H0F10002'
-  ContentPropagator: '001191110102MAD55U9H0F10002'
-  Label: '1'
-  ProduceID: '747be172-d847-4a27-be57-9091e07ef6e9'
-  PropagateID: '747be172-d847-4a27-be57-9091e07ef6e9'
-  ReservedCode1: 'cee8fdc4-0206-45ff-822a-206ec2029f25'
-  ReservedCode2: 'cee8fdc4-0206-45ff-822a-206ec2029f25'
----
 
 <div align="center">
   <br/>
@@ -494,5 +484,3 @@ pluginMgr.EventBus().Subscribe(plugin.EventUserLogin, func(ctx context.Context, 
 ## License
 
 MIT
-
-> AI生成
