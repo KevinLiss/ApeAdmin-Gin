@@ -229,6 +229,8 @@ func seedSettings(db *gorm.DB) {
 	var count int64
 	db.Model(&model.SysSetting{}).Count(&count)
 	if count > 0 {
+		// 已有库：补齐缺失的品牌类设置项（幂等）
+		migrateMissingSettings(db)
 		return
 	}
 
@@ -236,11 +238,33 @@ func seedSettings(db *gorm.DB) {
 		{Key: "site_name", Value: "ApeAdmin-Gin", IsPublic: true},
 		{Key: "logo_url", Value: "", IsPublic: true},
 		{Key: "primary_color", Value: "#5A67F5", IsPublic: true},
+		{Key: "admin_path", Value: "/admin", IsPublic: true},
+		{Key: "footer_text", Value: "ApeAdmin © 2026", IsPublic: true},
+		{Key: "login_bg", Value: "", IsPublic: true},
+		{Key: "sidebar_theme", Value: "light", IsPublic: true},
 	}
 	for _, s := range settings {
 		db.Create(&s)
 	}
 	log.Println("种子数据：系统设置已初始化")
+}
+
+// migrateMissingSettings 补齐缺失的品牌类设置项（不覆盖已有值）
+func migrateMissingSettings(db *gorm.DB) {
+	defaults := []model.SysSetting{
+		{Key: "admin_path", Value: "/admin", IsPublic: true},
+		{Key: "footer_text", Value: "ApeAdmin © 2026", IsPublic: true},
+		{Key: "login_bg", Value: "", IsPublic: true},
+		{Key: "sidebar_theme", Value: "light", IsPublic: true},
+	}
+	for _, d := range defaults {
+		var count int64
+		db.Model(&model.SysSetting{}).Where("key = ?", d.Key).Count(&count)
+		if count == 0 {
+			db.Create(&d)
+			log.Printf("种子数据：补充设置项 %s", d.Key)
+		}
+	}
 }
 
 // SeedAiProvider 初始化默认 AI 供应商（DeepSeek）

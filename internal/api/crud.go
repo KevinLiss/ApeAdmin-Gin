@@ -1,10 +1,16 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"apeadmin-gin/internal/core"
 	"apeadmin-gin/internal/dal"
 	"apeadmin-gin/internal/model"
 	"apeadmin-gin/internal/pkg/response"
@@ -304,4 +310,50 @@ func (h *SettingHandler) Update(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+}
+
+// BrandImage 品牌图片上传（Logo / 登录页背景），返回可访问的 URL
+func (h *SettingHandler) BrandImage(c *gin.Context) {
+	cfg := core.GetConfig()
+	if cfg == nil {
+		c.JSON(http.StatusInternalServerError, response.Error(500, "配置未初始化"))
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(400, "缺少文件字段 file"))
+		return
+	}
+
+	// 扩展名校验（仅图片）
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true, ".svg": true, ".ico": true}
+	if !allowed[ext] {
+		c.JSON(http.StatusBadRequest, response.Error(400, "仅支持图片格式（jpg/png/gif/webp/svg/ico）"))
+		return
+	}
+
+	// 大小校验（10MB）
+	if file.Size > 10*1024*1024 {
+		c.JSON(http.StatusBadRequest, response.Error(400, "图片大小不能超过 10MB"))
+		return
+	}
+
+	// 保存到 uploads/brand/ 目录
+	dir := filepath.Join(cfg.File.StorageDir, "brand")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(500, "创建目录失败"))
+		return
+	}
+	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
+	dst := filepath.Join(dir, filename)
+	if err := c.SaveUploadedFile(file, dst); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(500, "保存文件失败"))
+		return
+	}
+
+	// 返回可访问 URL（通过静态托管 /uploads 前缀映射到 storage_dir）
+	url := fmt.Sprintf("/uploads/brand/%s", filename)
+	c.JSON(http.StatusOK, response.Success(gin.H{"url": url}))
 }

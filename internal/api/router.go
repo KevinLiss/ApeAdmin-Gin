@@ -118,6 +118,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		settings.GET("", middleware.RequirePermission("system:setting:list"), setH.List)
 		settings.PUT("", middleware.RequirePermission("system:setting:edit"), setH.BatchUpdate)
 		settings.PUT("/:key", middleware.RequirePermission("system:setting:edit"), setH.Update)
+		settings.POST("/brand-image", middleware.RequirePermission("system:setting:edit"), setH.BrandImage)
 
 		// 仪表盘
 		dashboard := perm.Group("/dashboard")
@@ -195,5 +196,12 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 				"version": cfg.App.Version,
 			}))
 		})
+	}
+
+	// 上传文件静态托管（品牌图片等），映射到 file.storage_dir
+	if cfg.File.StorageDir != "" {
+		if _, err := os.Stat(cfg.File.StorageDir); err == nil {
+			r.Static("/uploads", cfg.File.StorageDir)
+		}
 	}
 }
