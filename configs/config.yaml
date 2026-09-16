@@ -1,8 +1,8 @@
-# ApeAdminGin 配置文件
+# ApeAdmin-Gin 配置文件
 # 环境变量覆盖示例：GA_DATABASE_TYPE=mysql 覆盖 database.type
 
 app:
-  name: "ApeAdminGin"
+  name: "ApeAdmin-Gin"
   version: "0.2.0"
   debug: true
   api_prefix: "/api/v1"

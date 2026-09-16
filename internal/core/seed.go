@@ -188,7 +188,7 @@ func seedSettings(db *gorm.DB) {
 	}
 
 	settings := []model.SysSetting{
-		{Key: "site_name", Value: "ApeAdminGin", IsPublic: true},
+		{Key: "site_name", Value: "ApeAdmin-Gin", IsPublic: true},
 		{Key: "logo_url", Value: "", IsPublic: true},
 		{Key: "primary_color", Value: "#5A67F5", IsPublic: true},
 	}

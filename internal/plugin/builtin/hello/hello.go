@@ -62,7 +62,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"apeadmin-gin/internal/dal"
 	"apeadmin-gin/internal/mcp"
+	"apeadmin-gin/internal/model"
 	"apeadmin-gin/internal/pkg/response"
 	"apeadmin-gin/internal/plugin"
 )
@@ -116,9 +118,16 @@ func (p *HelloPlugin) Dependencies() []string { return nil }
 // ────────────────────────────────────────────────────────────────────────────
 
 // OnLoad 加载时调用
-// 用途：初始化资源、校验运行环境、读取配置
+// 用途：初始化资源、校验运行环境、读取配置、在 sys_plugin 表中登记自己
 // 时机：应用启动时，由 Manager.Discover() 调用
 // 如果返回 error，插件会被跳过（不阻止其他插件加载），但仍保留在 plugins map 中
+//
+// 【L1 插件登记到 sys_plugin 表】
+// L1 插件是编译期内置的，但管理界面（插件管理页面）读取的是 sys_plugin 表。
+// 如果不在表中登记，插件虽然在运行（路由/MCP 工具已注册），但管理页面看不到它。
+// 因此 OnLoad 中需要幂等地写入 sys_plugin 记录：
+//   - 如果记录已存在（按 name 查），跳过
+//   - 如果不存在，创建一条记录（Enabled=true，因为 L1 插件编译期已激活）
 func (p *HelloPlugin) OnLoad() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -127,6 +136,35 @@ func (p *HelloPlugin) OnLoad() error {
 	p.callCount = 0
 	p.startedAt = time.Now().Format("2006-01-02 15:04:05")
 
+	// 在 sys_plugin 表中登记自己（幂等：已存在则跳过）
+	// 这样插件管理页面就能看到这个插件了
+	existing, err := dal.GetPluginByName(p.Name())
+	if err == nil && existing != nil {
+		// 已有记录，检查是否需要更新版本号等信息
+		if existing.Version != p.Version() || existing.DisplayName != p.DisplayName() {
+			existing.DisplayName = p.DisplayName()
+			existing.Description = p.Description()
+			existing.Version = p.Version()
+			existing.Author = p.Author()
+			existing.Enabled = true // L1 插件编译期已激活
+			_ = dal.UpdatePlugin(existing)
+		}
+	} else {
+		// 不存在，创建新记录
+		record := &model.SysPlugin{
+			Name:        p.Name(),
+			DisplayName: p.DisplayName(),
+			Description: p.Description(),
+			Version:     p.Version(),
+			Author:      p.Author(),
+			Enabled:     true, // L1 插件编译期已激活
+			ModulePath:  "(builtin)", // L1 插件无独立文件目录
+		}
+		if err := dal.CreatePlugin(record); err != nil {
+			log.Printf("[hello] 登记 sys_plugin 失败: %v（不影响插件运行）", err)
+		}
+	}
+
 	log.Printf("[hello] 插件已加载，启动时间: %s", p.startedAt)
 	return nil
 }
@@ -134,9 +172,9 @@ func (p *HelloPlugin) OnLoad() error {
 // Install 安装时调用
 // 用途：建表、注入种子数据、创建初始配置
 // 注意：当前框架版本中 Install() 不会被自动调用（L1 插件编译期已内置），
-//       此方法预留给未来"插件安装向导"功能使用，目前可留空实现
+//       L1 插件的登记逻辑已放在 OnLoad() 中执行，此方法预留扩展使用
 func (p *HelloPlugin) Install() error {
-	log.Printf("[hello] Install 调用（当前框架版本中此方法为预留，不自动触发）")
+	log.Printf("[hello] Install 调用（预留方法，当前由 OnLoad 完成登记）")
 	return nil
 }
 

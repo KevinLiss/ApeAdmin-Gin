@@ -183,7 +183,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		} else {
 			r.NoRoute(func(c *gin.Context) {
 				c.JSON(http.StatusOK, response.Success(gin.H{
-					"message": "ApeAdminGin API Server",
+					"message": "ApeAdmin-Gin API Server",
 					"version": cfg.App.Version,
 				}))
 			})
@@ -191,7 +191,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 	} else {
 		r.NoRoute(func(c *gin.Context) {
 			c.JSON(http.StatusOK, response.Success(gin.H{
-				"message": "ApeAdminGin API Server",
+				"message": "ApeAdmin-Gin API Server",
 				"version": cfg.App.Version,
 			}))
 		})
