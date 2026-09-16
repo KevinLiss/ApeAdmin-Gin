@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/pkg/response"
-	"gin-apeadmin/internal/service"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/response"
+	"apeadmin-gin/internal/service"
 )
 
 // RequirePermission 权限校验中间件

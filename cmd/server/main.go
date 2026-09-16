@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"gin-apeadmin/internal/bootstrap"
+	"apeadmin-gin/internal/bootstrap"
 )
 
 func main() {

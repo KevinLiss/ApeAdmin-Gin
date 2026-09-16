@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"gin-apeadmin/internal/config"
-	"gin-apeadmin/internal/model"
+	"apeadmin-gin/internal/config"
+	"apeadmin-gin/internal/model"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"

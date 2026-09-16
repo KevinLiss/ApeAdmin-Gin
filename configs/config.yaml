@@ -1,8 +1,8 @@
-# GinApeAdmin 配置文件
+# ApeAdminGin 配置文件
 # 环境变量覆盖示例：GA_DATABASE_TYPE=mysql 覆盖 database.type
 
 app:
-  name: "GinApeAdmin"
+  name: "ApeAdminGin"
   version: "0.2.0"
   debug: true
   api_prefix: "/api/v1"
@@ -16,7 +16,7 @@ database:
   port: 3306
   user: root
   password: ""
-  dbname: gin_apeadmin
+  dbname: apeadmin_gin
   max_open_conns: 50
   max_idle_conns: 10
   log_level: warn           # silent | error | warn | info

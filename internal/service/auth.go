@@ -1,9 +1,9 @@
 package service
 
 import (
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/schema"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/schema"
 )
 
 // GetUserPermissions 获取用户权限集合

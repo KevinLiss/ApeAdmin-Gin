@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/model"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/model"
 
 	"gorm.io/gorm"
 )

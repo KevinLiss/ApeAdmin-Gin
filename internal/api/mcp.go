@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/pkg/response"
-	"gin-apeadmin/internal/service"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/response"
+	"apeadmin-gin/internal/service"
 )
 
 // McpHandler MCP 管理 Handler

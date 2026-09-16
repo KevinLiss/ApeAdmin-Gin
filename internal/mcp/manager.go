@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 
-	"gin-apeadmin/internal/config"
-	"gin-apeadmin/internal/model"
+	"apeadmin-gin/internal/config"
+	"apeadmin-gin/internal/model"
 	"gorm.io/gorm"
 )
 

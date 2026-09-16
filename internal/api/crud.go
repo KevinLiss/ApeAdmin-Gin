@@ -5,9 +5,9 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/pkg/response"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/response"
 )
 
 type RoleHandler struct{}

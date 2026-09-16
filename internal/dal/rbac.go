@@ -1,8 +1,8 @@
 package dal
 
 import (
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/model"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/model"
 
 	"gorm.io/gorm"
 )

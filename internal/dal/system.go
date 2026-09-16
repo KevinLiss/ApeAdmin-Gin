@@ -1,6 +1,6 @@
 package dal
 
-import "gin-apeadmin/internal/model"
+import "apeadmin-gin/internal/model"
 
 // ─── 日志 ───
 

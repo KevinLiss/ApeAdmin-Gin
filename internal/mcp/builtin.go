@@ -27,7 +27,7 @@ func registerBuiltinResources(m *Manager) {
 				version = cfg.App.Version
 				debug = cfg.App.Debug
 			}
-			return fmt.Sprintf("App: GinApeAdmin %s\nDebug: %v\nGo: %s\nTime: %s",
+			return fmt.Sprintf("App: ApeAdminGin %s\nDebug: %v\nGo: %s\nTime: %s",
 				version, debug, runtime.Version(),
 				time.Now().Format("2006-01-02 15:04:05")), nil
 		},

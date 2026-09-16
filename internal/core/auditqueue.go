@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"gin-apeadmin/internal/model"
+	"apeadmin-gin/internal/model"
 
 	"gorm.io/gorm"
 )

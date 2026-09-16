@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/pkg/response"
-	"gin-apeadmin/internal/schema"
-	"gin-apeadmin/internal/service"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/pkg/response"
+	"apeadmin-gin/internal/schema"
+	"apeadmin-gin/internal/service"
 )
 
 // AuthHandler 认证相关 Handler

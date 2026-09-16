@@ -9,9 +9,9 @@ AIGC:
   ReservedCode2: 'd11e3aa4-47f4-417a-a709-ab14e0c5ef11'
 ---
 
-# gin-apeadmin 插件开发指南
+# apeadmin-gin 插件开发指南
 
-本文档面向 AI 和开发者，描述如何为 gin-apeadmin 编写插件。
+本文档面向 AI 和开发者，描述如何为 apeadmin-gin 编写插件。
 
 ## 插件层级
 
@@ -40,7 +40,7 @@ internal/plugin/builtin/
 3. 在 `init()` 中调用 `plugin.Register(&MyPlugin{})`
 4. 在 `internal/bootstrap/app.go` 中添加 blank import：
    ```go
-   _ "gin-apeadmin/internal/plugin/builtin/myplugin"
+   _ "apeadmin-gin/internal/plugin/builtin/myplugin"
    ```
 
 ### Plugin 接口（12 个方法）
@@ -288,7 +288,7 @@ manager.EmitEvent("my_custom_event", map[string]interface{}{"key": "value"})
 L1 插件除了通过 `PluginRouter` 获取 DB 和 MCP 外，还可以通过 `core` 包获取全局资源：
 
 ```go
-import "gin-apeadmin/internal/core"
+import "apeadmin-gin/internal/core"
 
 db   := core.GetDB()           // *gorm.DB
 cfg  := core.GetConfig()        // *config.Config

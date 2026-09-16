@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/model"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/model"
 )
 
 // OperationLog 操作日志采集中间件（异步队列投递）

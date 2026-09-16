@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gin-apeadmin/internal/config"
+	"apeadmin-gin/internal/config"
 )
 
 // Manifest L2 声明式插件清单

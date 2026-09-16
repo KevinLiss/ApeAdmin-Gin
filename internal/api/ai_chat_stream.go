@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/pkg/response"
-	"gin-apeadmin/internal/pkg/utils"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/response"
+	"apeadmin-gin/internal/pkg/utils"
 )
 
 const aiSystemPrompt = `你是 ApeAdmin 智能管理助手，可以帮助用户通过自然语言操作后台管理系统。

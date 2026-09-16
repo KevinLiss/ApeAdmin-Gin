@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/pkg/response"
-	"gin-apeadmin/internal/plugin"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/pkg/response"
+	"apeadmin-gin/internal/plugin"
 )
 
 // PluginHandler 插件管理 API

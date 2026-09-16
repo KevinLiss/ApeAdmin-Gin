@@ -3,9 +3,9 @@ package core
 import (
 	"log"
 
-	"gin-apeadmin/internal/config"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/pkg/utils"
+	"apeadmin-gin/internal/config"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/utils"
 
 	"gorm.io/gorm"
 )
@@ -188,7 +188,7 @@ func seedSettings(db *gorm.DB) {
 	}
 
 	settings := []model.SysSetting{
-		{Key: "site_name", Value: "GinApeAdmin", IsPublic: true},
+		{Key: "site_name", Value: "ApeAdminGin", IsPublic: true},
 		{Key: "logo_url", Value: "", IsPublic: true},
 		{Key: "primary_color", Value: "#5A67F5", IsPublic: true},
 	}

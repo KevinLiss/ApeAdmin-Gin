@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/pkg/utils"
-	"gin-apeadmin/internal/service"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/utils"
+	"apeadmin-gin/internal/service"
 
 	"gorm.io/gorm"
 )

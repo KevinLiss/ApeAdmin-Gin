@@ -5,10 +5,10 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/pkg/response"
-	"gin-apeadmin/internal/pkg/utils"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/response"
+	"apeadmin-gin/internal/pkg/utils"
 )
 
 type UserHandler struct{}

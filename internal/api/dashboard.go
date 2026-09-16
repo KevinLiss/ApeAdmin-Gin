@@ -17,9 +17,9 @@ import (
 	"github.com/shirou/gopsutil/v4/net"
 	"github.com/shirou/gopsutil/v4/process"
 
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/pkg/response"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/response"
 )
 
 // DashboardHandler 仪表盘 Handler

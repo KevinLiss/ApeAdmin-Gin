@@ -6,8 +6,8 @@ import (
 	"sync"
 	"syscall"
 
-	"gin-apeadmin/internal/config"
-	"gin-apeadmin/internal/mcp"
+	"apeadmin-gin/internal/config"
+	"apeadmin-gin/internal/mcp"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"

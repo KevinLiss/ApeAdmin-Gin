@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/config"
-	"gin-apeadmin/internal/middleware"
-	"gin-apeadmin/internal/pkg/response"
+	"apeadmin-gin/internal/config"
+	"apeadmin-gin/internal/middleware"
+	"apeadmin-gin/internal/pkg/response"
 )
 
 // PluginRouteRegistrar 插件路由注册回调
@@ -183,7 +183,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		} else {
 			r.NoRoute(func(c *gin.Context) {
 				c.JSON(http.StatusOK, response.Success(gin.H{
-					"message": "GinApeAdmin API Server",
+					"message": "ApeAdminGin API Server",
 					"version": cfg.App.Version,
 				}))
 			})
@@ -191,7 +191,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 	} else {
 		r.NoRoute(func(c *gin.Context) {
 			c.JSON(http.StatusOK, response.Success(gin.H{
-				"message": "GinApeAdmin API Server",
+				"message": "ApeAdminGin API Server",
 				"version": cfg.App.Version,
 			}))
 		})

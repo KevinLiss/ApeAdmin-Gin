@@ -5,10 +5,10 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/pkg/response"
-	"gin-apeadmin/internal/pkg/utils"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/response"
+	"apeadmin-gin/internal/pkg/utils"
 )
 
 // AiHandler AI 供应商 + 会话 + 对话 Handler
@@ -18,7 +18,7 @@ type AiHandler struct{}
 func getSecret() string {
 	cfg := core.GetConfig()
 	if cfg == nil || cfg.JWT.Secret == "" {
-		return "gin-apeadmin-default-secret"
+		return "apeadmin-gin-default-secret"
 	}
 	return cfg.JWT.Secret
 }

@@ -12,7 +12,7 @@ AIGC:
 <div align="center">
   <br/>
   <img src="assets/logo.png" width="130" alt="ApeAdmin Logo" />
-  <h1>Gin-ApeAdmin</h1>
+  <h1>ApeAdmin-Gin</h1>
   <p> ApeAdmin 的 Go 版本 · 面向高并发场景的 AI 后台管理框架</p>
 </div>
 
@@ -36,11 +36,11 @@ AIGC:
 
 ---
 
-> **本项目由 AI 驱动开发，人工负责产品与质量。** Gin-ApeAdmin 在 AI 辅助下高效迭代：人类开发者负责产品方向、架构评审、质量验证与最终决策，AI 负责加速实现、测试和文档工作。
+> **本项目由 AI 驱动开发，人工负责产品与质量。** ApeAdmin-Gin 在 AI 辅助下高效迭代：人类开发者负责产品方向、架构评审、质量验证与最终决策，AI 负责加速实现、测试和文档工作。
 
 ---
 
-Gin-ApeAdmin 是 ApeAdmin 的 Go 版本，面向高并发场景打造的后台开发框架，基于 Gin + GORM + Vue3 搭建平台化管理底座，原生为 AI Agent 能力调用做适配。
+ApeAdmin-Gin 是 ApeAdmin 的 Go 版本，面向高并发场景打造的后台开发框架，基于 Gin + GORM + Vue3 搭建平台化管理底座，原生为 AI Agent 能力调用做适配。
 
 Go 语言天生的高并发模型（goroutine + 极低的内存占用）让本框架特别适合**高并发项目**：万级 QPS 的业务系统、多实例横向扩展集群、资源受限的轻量部署环境。编译产出单个可执行文件，无运行时依赖，从开发到生产部署的体验极其简洁。
 
@@ -184,7 +184,7 @@ go run cmd/server/main.go
 
 ```bash
 # 切换 MySQL
-GA_DATABASE_TYPE=mysql GA_DATABASE_HOST=127.0.0.1 GA_DATABASE_DBNAME=gin_apeadmin go run cmd/server/main.go
+GA_DATABASE_TYPE=mysql GA_DATABASE_HOST=127.0.0.1 GA_DATABASE_DBNAME=apeadmin_gin go run cmd/server/main.go
 
 # 高并发生产：开启 Redis 共享令牌黑名单
 GA_REDIS_ENABLED=true GA_REDIS_URL=redis://localhost:6379/1 go run cmd/server/main.go
@@ -199,10 +199,10 @@ GA_REDIS_ENABLED=true GA_REDIS_URL=redis://localhost:6379/1 go run cmd/server/ma
 
 ## 架构
 
-Gin-ApeAdmin 是一个前后端分离的单体应用（可选 SPA 托管），后端插件化扩展，启动时自动迁移建表 + 种子数据：
+ApeAdmin-Gin 是一个前后端分离的单体应用（可选 SPA 托管），后端插件化扩展，启动时自动迁移建表 + 种子数据：
 
 ```
-gin-apeadmin/
+apeadmin-gin/
   cmd/server/                    # 程序入口
     main.go                      # flag 解析 + bootstrap.Run
   configs/
@@ -290,8 +290,8 @@ package hello
 
 import (
     "github.com/gin-gonic/gin"
-    "gin-apeadmin/internal/mcp"
-    "gin-apeadmin/internal/plugin"
+    "apeadmin-gin/internal/mcp"
+    "apeadmin-gin/internal/plugin"
 )
 
 // 实现 Plugin 接口
@@ -311,7 +311,7 @@ func (p *HelloPlugin) Install() error { return nil }
 func (p *HelloPlugin) Register(r *plugin.PluginRouter) error {
     // 公开路由
     r.Public.GET("/hello", func(c *gin.Context) {
-        c.JSON(200, gin.H{"msg": "Hello from Gin-ApeAdmin!"})
+        c.JSON(200, gin.H{"msg": "Hello from ApeAdmin-Gin!"})
     })
     // 需登录路由
     r.Authed.GET("/hello/me", func(c *gin.Context) { /* ... */ })

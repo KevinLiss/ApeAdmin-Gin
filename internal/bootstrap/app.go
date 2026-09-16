@@ -10,17 +10,17 @@ import (
 	"syscall"
 	"time"
 
-	"gin-apeadmin/internal/api"
-	"gin-apeadmin/internal/config"
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/mcp"
-	"gin-apeadmin/internal/middleware"
-	"gin-apeadmin/internal/model"
-	"gin-apeadmin/internal/plugin"
+	"apeadmin-gin/internal/api"
+	"apeadmin-gin/internal/config"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/mcp"
+	"apeadmin-gin/internal/middleware"
+	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/plugin"
 
 	// L1 内置插件（blank import，触发 init() 自注册）
-	_ "gin-apeadmin/internal/plugin/builtin/hello"
+	_ "apeadmin-gin/internal/plugin/builtin/hello"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

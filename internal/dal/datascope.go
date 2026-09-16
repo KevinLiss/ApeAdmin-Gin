@@ -1,7 +1,7 @@
 package dal
 
 import (
-	"gin-apeadmin/internal/model"
+	"apeadmin-gin/internal/model"
 
 	"gorm.io/gorm"
 )

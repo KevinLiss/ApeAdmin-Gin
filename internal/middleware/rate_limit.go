@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/pkg/response"
+	"apeadmin-gin/internal/pkg/response"
 )
 
 // tokenBucket 令牌桶

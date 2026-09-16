@@ -5,8 +5,8 @@ import (
 	"log"
 	"sync"
 
-	"gin-apeadmin/internal/config"
-	"gin-apeadmin/internal/mcp"
+	"apeadmin-gin/internal/config"
+	"apeadmin-gin/internal/mcp"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

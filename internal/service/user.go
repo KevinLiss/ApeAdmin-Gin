@@ -4,10 +4,10 @@ import (
 	"errors"
 	"time"
 
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/pkg/utils"
-	"gin-apeadmin/internal/schema"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/pkg/utils"
+	"apeadmin-gin/internal/schema"
 	"gorm.io/gorm"
 )
 

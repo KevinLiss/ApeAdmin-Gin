@@ -1,4 +1,4 @@
-module gin-apeadmin
+module apeadmin-gin
 
 go 1.26.0
 

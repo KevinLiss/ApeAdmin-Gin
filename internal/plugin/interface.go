@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/mcp"
+	"apeadmin-gin/internal/mcp"
 	"gorm.io/gorm"
 )
 

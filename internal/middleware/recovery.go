@@ -5,7 +5,7 @@ import (
 	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/pkg/response"
+	"apeadmin-gin/internal/pkg/response"
 )
 
 // Recovery panic 恢复中间件

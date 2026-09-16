@@ -1,7 +1,7 @@
 package core
 
 import (
-	"gin-apeadmin/internal/config"
+	"apeadmin-gin/internal/config"
 
 	"go.uber.org/zap"
 )

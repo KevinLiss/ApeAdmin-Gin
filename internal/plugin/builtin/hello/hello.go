@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // 【概述】
-// 这是 gin-apeadmin 的 L1 内置插件示例。L1 插件是编译期内置插件，
+// 这是 apeadmin-gin 的 L1 内置插件示例。L1 插件是编译期内置插件，
 // 代码直接编译进主二进制文件，通过 init() 函数自动注册到全局注册表。
 // 适合需要访问数据库、注册 HTTP 路由、注册 MCP 工具的场景。
 //
@@ -62,9 +62,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/mcp"
-	"gin-apeadmin/internal/pkg/response"
-	"gin-apeadmin/internal/plugin"
+	"apeadmin-gin/internal/mcp"
+	"apeadmin-gin/internal/pkg/response"
+	"apeadmin-gin/internal/plugin"
 )
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -226,8 +226,8 @@ func (p *HelloPlugin) OnUnload() {
 // Manager.Discover() 会遍历注册表并调用每个插件的 OnLoad()
 //
 // 【重要】确保此包被 import 的方式：
-//   方式一（推荐）：在 internal/bootstrap/app.go 中 import _ "gin-apeadmin/internal/plugin/builtin/hello"
-//   方式二：在 cmd/server/main.go 中 import _ "gin-apeadmin/internal/plugin/builtin/hello"
+//   方式一（推荐）：在 internal/bootstrap/app.go 中 import _ "apeadmin-gin/internal/plugin/builtin/hello"
+//   方式二：在 cmd/server/main.go 中 import _ "apeadmin-gin/internal/plugin/builtin/hello"
 //   使用 blank import（_ "路径"）因为只需要执行 init()，不需要直接引用包内符号
 func init() {
 	plugin.Register(&HelloPlugin{})

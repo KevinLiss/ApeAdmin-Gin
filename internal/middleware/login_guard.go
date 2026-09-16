@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/pkg/response"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/pkg/response"
 )
 
 // loginGuardEntry 登录失败记录

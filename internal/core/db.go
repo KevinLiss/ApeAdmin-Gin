@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"gin-apeadmin/internal/config"
+	"apeadmin-gin/internal/config"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/mysql"

@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"gin-apeadmin/internal/core"
-	"gin-apeadmin/internal/dal"
-	"gin-apeadmin/internal/pkg/response"
+	"apeadmin-gin/internal/core"
+	"apeadmin-gin/internal/dal"
+	"apeadmin-gin/internal/pkg/response"
 )
 
 // JWTAuth JWT 认证中间件
