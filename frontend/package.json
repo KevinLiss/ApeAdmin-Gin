@@ -1,0 +1,39 @@
+{
+  "name": "apeadmin-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "@fullcalendar/core": "^6.1.21",
+    "@fullcalendar/daygrid": "^6.1.21",
+    "@fullcalendar/interaction": "^6.1.21",
+    "@fullcalendar/vue3": "^6.1.21",
+    "axios": "^1.7.9",
+    "dompurify": "^3.4.14",
+    "echarts": "^5.6.0",
+    "element-plus": "^2.9.0",
+    "marked": "^18.0.10",
+    "pinia": "^2.3.0",
+    "prismjs": "^1.30.0",
+    "vue": "^3.5.13",
+    "vue-clipboard3": "^2.0.0",
+    "vue-echarts": "^6.7.3",
+    "vue-router": "^4.5.0",
+    "vue3-verify": "^0.0.3",
+    "vuedraggable": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/prismjs": "^1.26.6",
+    "@types/sortablejs": "^1.15.9",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vue-tsc": "^2.1.10"
+  }
+}

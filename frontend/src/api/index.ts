@@ -1,0 +1,212 @@
+import request from './request'
+
+// ---- Auth ----
+export const login = (data: { username: string; password: string }) =>
+  request.post('/auth/login', data)
+
+export const getUserInfo = () => request.get('/auth/userinfo')
+
+// 个人中心
+export const getProfile = () => request.get('/auth/profile')
+export const updateProfile = (data: any) => request.put('/auth/profile', data)
+export const changePassword = (data: any) => request.put('/auth/profile/password', data)
+
+export const logout = () => request.post('/auth/logout')
+
+// ---- Users ----
+export const getUsers = (params: any) => request.get('/users', { params })
+export const createUser = (data: any) => request.post('/users', data)
+export const updateUser = (id: number, data: any) => request.put(`/users/${id}`, data)
+export const deleteUser = (id: number) => request.delete(`/users/${id}`)
+export const resetUserPassword = (id: number, newPassword: string) =>
+  request.put(`/users/${id}/reset-password?new_password=${encodeURIComponent(newPassword)}`)
+
+// ---- Roles ----
+export const getRoles = (params: any = {}) => request.get('/roles', { params })
+export const createRole = (data: any) => request.post('/roles', data)
+export const updateRole = (id: number, data: any) => request.put(`/roles/${id}`, data)
+export const deleteRole = (id: number) => request.delete(`/roles/${id}`)
+export const getAllRoles = () => request.get('/roles/all')
+
+// ---- Menus ----
+export const getMenuTree = () => request.get('/menus/tree')
+export const createMenu = (data: any) => request.post('/menus', data)
+export const updateMenu = (id: number, data: any) => request.put(`/menus/${id}`, data)
+export const deleteMenu = (id: number) => request.delete(`/menus/${id}`)
+
+// ---- Depts ----
+export const getDeptTree = () => request.get('/depts/tree')
+export const createDept = (data: any) => request.post('/depts', data)
+export const updateDept = (id: number, data: any) => request.put(`/depts/${id}`, data)
+export const deleteDept = (id: number) => request.delete(`/depts/${id}`)
+
+// ---- Plugins ----
+export const getPlugins = (params: any = {}) => request.get('/plugins', { params })
+export const togglePlugin = (id: number, enabled: boolean) =>
+  request.put(`/plugins/${id}/toggle`, { enabled })
+export const getPluginConfig = (id: number) => request.get(`/plugins/${id}/config`)
+export const updatePluginConfig = (id: number, config: any) =>
+  request.put(`/plugins/${id}/config`, { config })
+export const uploadPlugin = (file: File) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post('/plugins/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000, // 2 min for large plugin packages (up to 50 MB)
+  })
+}
+export const restartServer = () => request.post('/plugins/restart')
+export const deletePlugin = (id: number) => request.delete(`/plugins/${id}`)
+
+// ---- MCP ----
+export const getMcpTools = () => request.get('/mcp/tools')
+export const getMcpToolCategories = () => request.get('/mcp/tools/categories')
+export const callMcpTool = (name: string, arguments_: any) =>
+  request.post('/mcp/tools/call', { name, arguments: arguments_ })
+export const getMcpResources = () => request.get('/mcp/resources')
+export const getMcpResourcesRead = (params: any) =>
+  request.get('/mcp/resources/read', { params })
+export const getMcpPrompts = () => request.get('/mcp/prompts')
+export const renderMcpPrompt = (name: string, arguments_: any) =>
+  request.post('/mcp/prompts/render', { name, arguments: arguments_ })
+export const getMcpAuditLogs = (params: any = {}) => request.get('/mcp/audit-logs', { params })
+
+// ---- AI 模型密钥管理 ----
+export const getProviders = (params: any = {}) => request.get('/ai/providers', { params })
+export const getAllProviders = () => request.get('/ai/providers/all')
+export const createProvider = (data: any) => request.post('/ai/providers', data)
+export const updateProvider = (id: number, data: any) => request.put(`/ai/providers/${id}`, data)
+export const deleteProvider = (id: number) => request.delete(`/ai/providers/${id}`)
+export const testProvider = (id: number) => request.post(`/ai/providers/${id}/test`)
+
+// ---- AI 对话 ----
+export const chat = (data: any) => request.post('/ai/chat', data)
+
+// ---- AI 会话持久化 ----
+export const getChatSessions = () => request.get('/ai/sessions')
+export const createChatSession = (title?: string) =>
+  request.post('/ai/sessions', { title: title || null })
+export const getChatSessionMessages = (id: number) => request.get(`/ai/sessions/${id}`)
+export const renameChatSession = (id: number, title: string) =>
+  request.put(`/ai/sessions/${id}`, { title })
+export const deleteChatSession = (id: number) => request.delete(`/ai/sessions/${id}`)
+export const appendChatMessage = (
+  id: number,
+  data: { role: string; content: string; tool_events?: any[] | null }
+) => request.post(`/ai/sessions/${id}/messages`, data)
+
+// ---- 系统日志 ----
+export const getLogs = (params: any = {}) => request.get('/logs', { params })
+export const getLogDetail = (id: number) => request.get(`/logs/${id}`)
+export const deleteLog = (id: number) => request.delete(`/logs/${id}`)
+export const clearLogs = () => request.delete('/logs')
+
+// ---- 仪表盘统计 ----
+export const getDashboardStats = () => request.get('/dashboard/stats')
+export const getDashboardSystem = () => request.get('/dashboard/system')
+
+// ---- System files ----
+export const getFileFolders = () => request.get('/files/folders/tree')
+export const getFiles = (params: any = {}) => request.get('/files', { params })
+export const createFileFolder = (data: any) => request.post('/files/folders', data)
+export const renameFileFolder = (id: number, data: any) => request.put(`/files/folders/${id}`, data)
+export const deleteFileFolder = (id: number) => request.delete(`/files/folders/${id}`)
+export const uploadSystemFile = (file: File, folderId: number) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post(`/files/upload?folder_id=${folderId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+export const deleteSystemFile = (id: number) => request.delete(`/files/${id}`)
+export const downloadSystemFileUrl = (id: number) => `/api/v1/files/${id}/download`
+export const previewSystemFileUrl = (id: number) => `/api/v1/files/${id}/download?preview=1`
+export const moveSystemFile = (id: number, folderId: number) => request.post(`/files/${id}/move`, { folder_id: folderId })
+export const moveSystemFolder = (id: number, folderId: number) => request.post(`/files/folders/${id}/move`, { folder_id: folderId })
+// ---- 素材存储（物理目录浏览） ----
+export const getAssetGroups = () => request.get('/files/assets/groups')
+export const getAssetList = (params: { group: string; path?: string }) => request.get('/files/assets/list', { params })
+export const deleteAsset = (group: string, path: string) => request.delete('/files/assets', { params: { group, path } })
+export const assetDownloadUrl = (group: string, path: string) => `/api/v1/files/assets/download?${new URLSearchParams({ group, path })}`
+export const assetPreviewUrl = (group: string, path: string) => `/api/v1/files/assets/download?${new URLSearchParams({ group, path, preview: '1' })}`
+
+// ---- 系统设置 ----
+export const getPublicSettings = () => request.get('/settings/public')
+export const getSettings = () => request.get('/settings')
+export const updateSettings = (items: Record<string, string>) => request.put('/settings', items)
+export const updateSetting = (key: string, value: string) => request.put(`/settings/${key}`, { value })
+
+// ---- 系统版本与更新 ----
+export const getSystemVersion = () => request.get('/system/version')
+export const uploadSystemUpdate = (file: File, onProgress?: (percent: number) => void) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post('/system/update', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 300000, // 5 min timeout for large packages
+    onUploadProgress: (e: any) => {
+      if (onProgress && e.total) {
+        onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+    },
+  })
+}
+
+/**
+ * SSE 流式对话 —— 使用 fetch + ReadableStream 解析 SSE
+ * @param data  ChatStreamRequest body
+ * @param onChunk  每收到一个 SSE event JSON 调用
+ * @returns AbortController（可用于中止请求）
+ */
+export function chatStream(
+  data: any,
+  onChunk: (event: any) => void
+): AbortController {
+  const controller = new AbortController()
+  const token = localStorage.getItem('apeadmin_token')
+
+  fetch('/api/v1/ai/chat/stream', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: token ? `Bearer ${token}` : '',
+    },
+    body: JSON.stringify(data),
+    signal: controller.signal,
+  })
+    .then(async (resp) => {
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const reader = resp.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const chunk = line.slice(6).trim()
+            if (!chunk) continue
+            try {
+              onChunk(JSON.parse(chunk))
+            } catch {
+              // skip invalid JSON
+            }
+          }
+        }
+      }
+    })
+    .catch((err) => {
+      if (err.name !== 'AbortError') {
+        onChunk({ type: 'error', message: err.message || '请求失败' })
+      }
+    })
+
+  return controller
+}
+
+// ---- Dev Example (插件开发示例) ----
+export const getDevExampleNotes = (params: any) => request.get('/dev-example/notes', { params })
+export const createDevExampleNote = (data: any) => request.post('/dev-example/notes', data)
+export const updateDevExampleNote = (id: number, data: any) => request.put(`/dev-example/notes/${id}`, data)
+export const deleteDevExampleNote = (id: number) => request.delete(`/dev-example/notes/${id}`)

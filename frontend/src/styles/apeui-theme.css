@@ -1,0 +1,501 @@
+/* ============================================================
+   ApeUI Purple Theme — ApeAdmin #5A67F5 紫色系
+   覆盖 Element Plus CSS 变量，全局换肤
+   ============================================================ */
+
+:root {
+  /* ApeAdmin 主色 #5A67F5 */
+  --el-color-primary: #5A67F5;  --el-color-primary-light-3: #7F8AF8;
+  --el-color-primary-light-5: #A5ACFA;
+  --el-color-primary-light-7: #C9CDFC;
+  --el-color-primary-light-8: #DBDFFD;
+  --el-color-primary-light-9: #EDF0FE;
+  --el-color-primary-dark-2: #4755E6;
+  --el-color-primary-rgb: 90, 103, 245;
+
+  /* ApeAdmin 语义色 */
+  --el-color-success: #67c100;
+  --el-color-success-light-3: #96d44f;
+  --el-color-success-light-5: #b2e080;
+  --el-color-success-light-7: #cfebaf;
+  --el-color-success-light-8: #ddf0c5;
+  --el-color-success-light-9: #e9f5db;
+  --el-color-success-dark-2: #539b00;
+
+  --el-color-warning: #e56809;
+  --el-color-warning-light-3: #ed8f42;
+  --el-color-warning-light-5: #f2b274;
+  --el-color-warning-light-7: #f6d4a6;
+  --el-color-warning-light-8: #f9e2bf;
+  --el-color-warning-light-9: #fcf0d9;
+  --el-color-warning-dark-2: #b85307;
+
+  --el-color-danger: #dc0808;
+  --el-color-danger-light-3: #e63b3b;
+  --el-color-danger-light-5: #ee7676;
+  --el-color-danger-light-7: #f4a8a8;
+  --el-color-danger-light-8: #f8c0c0;
+  --el-color-danger-light-9: #fbd7d7;
+  --el-color-danger-dark-2: #b00606;
+
+  --el-color-info: #3ebcb9;
+  --el-color-info-light-3: #6ccfcd;
+  --el-color-info-light-5: #9adbda;
+  --el-color-info-light-7: #c3e9e8;
+  --el-color-info-light-8: #d6efee;
+  --el-color-info-light-9: #e9f5f5;
+  --el-color-info-dark-2: #319695;
+
+  /* ApeAdmin 字体 */
+  --el-font-family: 'Rubik', 'Roboto', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --el-font-size-base: 14px;
+
+  /* ApeAdmin 圆角 */
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 5px;
+  --el-border-radius-round: 20px;
+
+  /* ApeAdmin 边框色 */
+  --el-border-color: #e9edf3;
+  --el-border-color-light: #f0f2f5;
+  --el-border-color-lighter: #f5f7fa;
+  --el-border-color-dark: #d0d4dc;
+
+  /* ApeAdmin 文字色 */
+  --el-text-color-primary: #2b2b2b;
+  --el-text-color-regular: #5a6273;
+  --el-text-color-secondary: #909399;
+  --el-text-color-placeholder: #c0c4cc;
+
+  /* ApeAdmin 背景色 */
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #eff3f9;
+  --el-bg-color-overlay: #ffffff;
+  --el-fill-color-blank: #ffffff;
+  --el-fill-color-light: #f5f7fa;
+
+  /* Logo 蓝紫渐变品牌色 */
+  --apeui-grad-1: #5A67F5;   /* 蓝紫主色 */
+  --apeui-grad-2: #47A8FF;   /* 青蓝 */
+  --apeui-grad-3: #7A5BFF;   /* 亮蓝紫 */
+  --apeui-grad-4: #47D8FF;   /* 亮青蓝 */
+
+  /* 全局布局变量（浅色） */
+  --theme-body-bg: #eff3f9;
+  --theme-card-bg: #ffffff;
+  --theme-border: #e9edf3;
+  --theme-text: #2b2b2b;
+  --theme-text-secondary: #5a6273;
+  --theme-text-muted: #909399;
+}
+
+/* Logo 渐变背景工具类 */
+.apeui-gradient-bg {
+  background: linear-gradient(135deg, #5A67F5 0%, #47D8FF 100%);
+}
+.apeui-gradient-text {
+  background: linear-gradient(135deg, #5A67F5 0%, #47D8FF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ============================================================
+   深色模式 —— html.dark 变量覆盖
+   在 :root 浅色变量之上覆盖 Element Plus + 全局 CSS 变量
+   ============================================================ */
+html.dark {
+  /* Element Plus 基础色 */
+  --el-color-primary: #7F8AF8;
+  --el-color-primary-light-3: #A5ACFA;
+  --el-color-primary-light-5: #C9CDFC;
+  --el-color-primary-light-7: #DBDFFD;
+  --el-color-primary-light-8: #4B55C9;
+  --el-color-primary-light-9: #3A4294;
+  --el-color-primary-dark-2: #5A67F5;
+
+  --el-color-success: #67c100;
+  --el-color-warning: #e56809;
+  --el-color-danger: #dc0808;
+  --el-color-info: #3ebcb9;
+
+  /* 边框 */
+  --el-border-color: #3a3f52;
+  --el-border-color-light: #34394a;
+  --el-border-color-lighter: #2e3344;
+  --el-border-color-dark: #4a5066;
+
+  /* 文字 */
+  --el-text-color-primary: #e6e8f0;
+  --el-text-color-regular: #b8bdd0;
+  --el-text-color-secondary: #8a90a8;
+  --el-text-color-placeholder: #6b7089;
+
+  /* 背景 */
+  --el-bg-color: #232838;
+  --el-bg-color-page: #1b1f2e;
+  --el-bg-color-overlay: #262b3d;
+  --el-fill-color-blank: #232838;
+  --el-fill-color-light: #2e3344;
+  --el-fill-color-lighter: #333a4e;
+
+  /* 全局布局变量 */
+  --theme-body-bg: #1b1f2e;
+  --theme-card-bg: #232838;
+  --theme-border: #363b4f;
+  --theme-text: #e6e8f0;
+  --theme-text-secondary: #b8b9d0;
+  --theme-text-muted: #8f90a8;
+}
+
+/* 深色模式全局基础样式 */
+html.dark body {
+  color: #e6e8f0;
+  background-color: #1b1f2e;
+}
+html.dark .layout-main .main {
+  background-color: #1b1f2e;
+}
+html.dark .ape-card {
+  background: #232838;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
+}
+html.dark .apeui-content .el-card {
+  background: #232838;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
+}
+html.dark .apeui-content .el-card.is-never-shadow {
+  border-color: rgba(127, 138, 248, 0.18);
+}
+html.dark .apeui-page-header {
+  border-bottom-color: #36394a;
+}
+html.dark .apeui-page-header h3,
+html.dark .page-head h3 {
+  color: #e6e8f0;
+}
+html.dark .apeui-page-header .breadcrumb,
+html.dark .breadcrumb {
+  color: #8f90a8;
+}
+
+/* 表格、表单、弹层在深色下统一底色 */
+html.dark .el-table,
+html.dark .el-table tr,
+html.dark .el-table th.el-table__cell,
+html.dark .el-table td.el-table__cell {
+  background-color: transparent;
+  color: #e6e8f0;
+}
+html.dark .el-table th.el-table__cell {
+  color: #e6e8f0;
+  border-bottom-color: rgba(127, 138, 248, 0.2);
+}
+html.dark .el-table td.el-table__cell {
+  border-bottom-color: rgba(127, 138, 248, 0.1);
+}
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: #2a2f42;
+}
+html.dark .el-table__body tr:hover > td.el-table__cell {
+  background-color: #2e3344 !important;
+}
+
+html.dark .el-dialog,
+html.dark .el-message-box,
+html.dark .el-popper,
+html.dark .el-dropdown-menu,
+html.dark .el-select__popper,
+html.dark .el-picker__popper {
+  background-color: #262b3d;
+  border-color: #36394a;
+}
+html.dark .el-popper.is-light {
+  background: #262b3d;
+  border-color: #36394a;
+  color: #e6e8f0;
+}
+
+html.dark .el-input__wrapper,
+html.dark .el-textarea__inner {
+  background-color: #2e3344;
+  box-shadow: 0 0 0 1px #3a3f55 inset;
+}
+html.dark .el-input__inner {
+  color: #e6e8f0;
+}
+html.dark .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #7F8AF8 inset;
+}
+html.dark .el-form-item__label {
+  color: #b8b9d0;
+}
+
+html.dark .el-divider {
+  border-color: #36394a;
+}
+html.dark .el-tabs__item {
+  color: #8f90a8;
+}
+html.dark .el-tabs__item.is-active {
+  color: #7F8AF8;
+}
+html.dark .el-timeline-item__timestamp {
+  color: #8f90a8;
+}
+html.dark .el-descriptions__label,
+html.dark .el-descriptions__content {
+  color: #e6e8f0;
+}
+
+/* ============================================================
+   全局基础样式
+   ============================================================ */
+body {
+  font-family: 'Rubik', 'Roboto', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  color: #2b2b2b;
+  background-color: #eff3f9;
+  margin: 0;
+}
+
+/* ============================================================
+   ApeUI 公共布局组件样式
+   ============================================================ */
+
+/* 页面标题栏 */
+.apeui-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e9edf3;
+}
+.apeui-page-header h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #2b2b2b;
+}
+.apeui-page-header .breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #909399;
+}
+
+/* 统计卡片网格 */
+.stat-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 0 20px rgba(89, 102, 122, 0.06);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(90, 103, 245, 0.12);
+}
+.stat-card .stat-icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  flex-shrink: 0;
+  font-size: 24px;
+}
+.stat-card .stat-body { flex: 1; }
+.stat-card .stat-label { font-size: 13px; color: #909399; margin-bottom: 6px; }
+.stat-card .stat-value { font-size: 28px; font-weight: 700; color: #2b2b2b; line-height: 1.2; }
+.stat-card .stat-trend { margin-top: 8px; font-size: 12px; }
+.stat-card .stat-trend .up { color: #67c100; font-weight: 600; }
+.stat-card .stat-trend .down { color: #dc0808; font-weight: 600; }
+
+/* ============================================================
+   ApeAdmin 卡片公共样式 — 所有 APEUI 页面共享
+   ============================================================ */
+.ape-card {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 0 20px rgba(8, 21, 66, 0.05);
+  border: none;
+  margin-bottom: 30px;
+  transition: box-shadow 0.3s ease;
+  overflow: hidden;
+}
+.ape-card:hover {
+  box-shadow: 0 0 40px rgba(8, 21, 66, 0.05);
+}
+.ape-card .card-header {
+  padding: 25px 25px 0;
+  border-bottom: none;
+  background: transparent;
+}
+.ape-card .card-header h3 {
+  font-size: 20px;
+  font-weight: 500;
+  color: #5A67F5;
+  margin: 0;
+}
+.ape-card .card-body {
+  padding: 25px;
+}
+.ape-badge-soft {
+  background-color: rgba(90, 103, 245, 0.05);
+  font-size: 12px;
+  color: #5A67F5;
+  padding: 8px 13px;
+  border-radius: 9px;
+  font-weight: 400;
+}
+
+/* ============================================================
+   APEUI 内容区 — 全局 el-card ApeAdmin 风格覆盖
+   所有 /apeui 路由下的 el-card 自动变 ApeAdmin 风格
+   ============================================================ */
+.apeui-content .el-card {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 0 20px rgba(8, 21, 66, 0.05);
+  margin-bottom: 30px;
+  transition: box-shadow 0.3s ease;
+  overflow: hidden;
+}
+.apeui-content .el-card:hover {
+  box-shadow: 0 0 40px rgba(8, 21, 66, 0.08);
+}
+/* el-card header — ApeAdmin 风格：紫色标题、无边框、透明背景 */
+.apeui-content .el-card__header {
+  padding: 25px 25px 0;
+  border-bottom: none;
+  background: transparent;
+  font-size: 20px;
+  font-weight: 500;
+  color: #5A67F5;
+}
+/* el-card body — ApeAdmin 风格：25px 内边距 */
+.apeui-content .el-card__body {
+  padding: 25px;
+}
+/* shadow=never 时仍然无阴影但保持圆角 */
+.apeui-content .el-card.is-never-shadow {
+  box-shadow: none;
+  border: 1px solid rgba(90, 103, 245, 0.10);
+}
+/* shadow=always 时保持阴影 */
+.apeui-content .el-card.is-always-shadow {
+  box-shadow: 0 0 20px rgba(8, 21, 66, 0.05);
+}
+
+/* ============================================================
+   APEUI 内容区 — 其他 EP 组件 ApeAdmin 风格微调
+   ============================================================ */
+
+/* el-row 间距统一为 30px (ApeAdmin gutter) */
+.apeui-content .el-row {
+  margin-bottom: 0;
+}
+.apeui-content .el-row + .el-row {
+  margin-top: 0;
+}
+
+/* el-table — ApeAdmin 风格 */
+.apeui-content .el-table {
+  border-radius: 0;
+  font-size: 14px;
+}
+.apeui-content .el-table th.el-table__cell {
+  background-color: transparent;
+  color: #2b2b2b;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(90, 103, 245, 0.10);
+}
+.apeui-content .el-table td.el-table__cell {
+  border-bottom: 1px solid rgba(90, 103, 245, 0.06);
+}
+
+/* el-tag — ApeAdmin badge soft 风格 */
+.apeui-content .el-tag {
+  border-radius: 9px;
+  font-size: 12px;
+  padding: 0 13px;
+  height: auto;
+  line-height: 28px;
+}
+
+/* el-button — ApeAdmin 圆角 */
+.apeui-content .el-button {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+/* el-alert — ApeAdmin 风格圆角 */
+.apeui-content .el-alert {
+  border-radius: 20px;
+}
+
+/* el-dialog — ApeAdmin 风格圆角 */
+.apeui-content .el-dialog {
+  border-radius: 20px;
+}
+
+/* el-tabs — ApeAdmin 风格 */
+.apeui-content .el-tabs__item {
+  font-size: 15px;
+  font-weight: 500;
+  color: #5a6273;
+}
+.apeui-content .el-tabs__item.is-active {
+  color: #5A67F5;
+}
+.apeui-content .el-tabs__active-bar {
+  background-color: #5A67F5;
+}
+
+/* el-collapse — ApeAdmin 风格 */
+.apeui-content .el-collapse {
+  border-top: 1px solid rgba(90, 103, 245, 0.10);
+  border-bottom: 1px solid rgba(90, 103, 245, 0.10);
+}
+.apeui-content .el-collapse-item__header {
+  font-size: 15px;
+  font-weight: 500;
+  color: #2b2b2b;
+}
+
+/* el-progress — ApeAdmin 风格 */
+.apeui-content .el-progress-bar__outer {
+  border-radius: 9px;
+}
+.apeui-content .el-progress-bar__inner {
+  border-radius: 9px;
+}
+
+/* PageHeader 标题颜色改为 ApeAdmin 风格 */
+.apeui-content .apeui-page-header h3 {
+  font-size: 20px;
+  font-weight: 500;
+  color: #5A67F5;
+}
+
+/* 响应式 */
+@media (max-width: 1200px) {
+  .stat-card-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .stat-card-grid { grid-template-columns: 1fr; }
+}

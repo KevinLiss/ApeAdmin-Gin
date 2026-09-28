@@ -46,3 +46,5 @@ uploads/files/*
 
 # 前端（复用 apeadmin，按需处理）
 frontend/*.png
+frontend/node_modules/
+frontend/dist/

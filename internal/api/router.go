@@ -170,8 +170,16 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 	// SPA 静态文件服务
 	if cfg.App.SPADir != "" {
 		if _, err := os.Stat(cfg.App.SPADir); err == nil {
-			r.Static("/assets", filepath.Join(cfg.App.SPADir, "assets"))
+			// 前端 base 为 /admin/，静态资源挂到 /admin/assets；同时保留 /assets 兼容
+			assetsDir := filepath.Join(cfg.App.SPADir, "assets")
+			if cfg.App.AdminPath != "" {
+				r.Static(cfg.App.AdminPath+"/assets", assetsDir)
+			}
+			r.Static("/assets", assetsDir)
 			r.StaticFile("/favicon.ico", filepath.Join(cfg.App.SPADir, "favicon.ico"))
+			if cfg.App.AdminPath != "" {
+				r.StaticFile(cfg.App.AdminPath+"/favicon.ico", filepath.Join(cfg.App.SPADir, "favicon.ico"))
+			}
 			// SPA fallback：非 API 路径返回 index.html
 			r.NoRoute(func(c *gin.Context) {
 				if strings.HasPrefix(c.Request.URL.Path, cfg.App.APIPrefix) ||
