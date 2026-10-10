@@ -33,7 +33,7 @@
           <li class="sidebar-list">
             <router-link :to="resolvePath('', menu.path)" class="sidebar-link" :class="{ active: activeMenu === resolvePath('', menu.path) }">
               <el-icon class="menu-icon"><component :is="menu.icon || 'Menu'" /></el-icon>
-              <span>{{ menu.name }}</span>
+              <span>{{ menuLabel(menu) }}</span>
             </router-link>
           </li>
         </ul>
@@ -42,7 +42,7 @@
         <ul v-else-if="menu.type === 'M' && menu.children?.length" class="sidebar-links">
           <li class="sidebar-main-title sidebar-group-toggle" @click="toggleTopMenu(menu.id)">
             <div>
-              <h4>{{ menu.name }}</h4>
+              <h4>{{ menuLabel(menu) }}</h4>
               <el-icon class="sub-arrow" :class="{ open: isTopMenuOpen(menu.id) }"><ArrowDown /></el-icon>
             </div>
           </li>
@@ -58,24 +58,24 @@
             <template v-if="child.children?.some((c: any) => c.type !== 'F')">
               <a class="sidebar-link sidebar-title" href="javascript:void(0)" @click="toggleSub(child.id)">
                 <el-icon class="menu-icon"><component :is="child.icon || 'Menu'" /></el-icon>
-                <span>{{ child.name }}</span>
+                <span>{{ menuLabel(child) }}</span>
                 <el-icon class="sub-arrow" :class="{ open: openedSub === child.id }"><ArrowDown /></el-icon>
               </a>
               <!-- Expanded: inline submenu -->
               <ul class="sidebar-submenu" v-show="openedSub === child.id">
                 <li v-for="grandchild in child.children.filter((c: any) => c.type !== 'F')" :key="grandchild.id">
                   <router-link :to="resolvePath(menu.path, child.path, grandchild.path)" :class="{ active: route.path === resolvePath(menu.path, child.path, grandchild.path) }">
-                    {{ grandchild.name }}
+                    {{ menuLabel(grandchild) }}
                   </router-link>
                 </li>
               </ul>
               <!-- Collapsed: flyout submenu -->
               <div class="flyout-submenu" v-if="collapsed && !isMobile && hoverSub === child.id">
-                <h6>{{ child.name }}</h6>
+                <h6>{{ menuLabel(child) }}</h6>
                 <ul>
                   <li v-for="grandchild in child.children.filter((c: any) => c.type !== 'F')" :key="grandchild.id">
                     <router-link :to="resolvePath(menu.path, child.path, grandchild.path)" :class="{ active: route.path === resolvePath(menu.path, child.path, grandchild.path) }">
-                      {{ grandchild.name }}
+                      {{ menuLabel(grandchild) }}
                     </router-link>
                   </li>
                 </ul>
@@ -85,7 +85,7 @@
             <template v-else>
               <router-link :to="resolvePath(menu.path, child.path)" class="sidebar-link" :class="{ active: activeMenu === resolvePath(menu.path, child.path) }">
                 <el-icon class="menu-icon"><component :is="child.icon || 'Menu'" /></el-icon>
-                <span>{{ child.name }}</span>
+                <span>{{ menuLabel(child) }}</span>
               </router-link>
             </template>
           </li>
@@ -97,9 +97,9 @@
     <div class="sidebar-footer">
       <div class="upgrade-card">
         <img class="upgrade-img" src="/assets/images/sidebar/2.png" alt="" />
-        <h5>全能助手</h5>
-        <p>告别传统，AI全面接管系统</p>
-        <button class="upgrade-btn" @click="goAiChat">前往体验</button>
+        <h5>{{ t('common.sidebar.allRoundAssistant') }}</h5>
+        <p>{{ t('common.sidebar.allRoundDesc') }}</p>
+        <button class="upgrade-btn" @click="goAiChat">{{ t('common.sidebar.allRoundGo') }}</button>
       </div>
     </div>
   </aside>
@@ -108,6 +108,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useSettingsStore } from '@/stores/settings'
 
@@ -126,6 +127,17 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const settingsStore = useSettingsStore()
+const { t } = useI18n()
+
+/** 菜单名：优先用 i18n_key 翻译，缺失时回退原始 name */
+function menuLabel(menu: any): string {
+  if (menu.i18n_key) {
+    const translated = t(menu.i18n_key)
+    // key 未命中时 vue-i18n 返回 key 本身，此时回退原始菜单名
+    if (translated !== menu.i18n_key) return translated
+  }
+  return menu.name
+}
 const activeMenu = computed(() => route.path)
 const openedSub = ref<string | number | null>(null)
 const hoverSub = ref<string | number | null>(null)

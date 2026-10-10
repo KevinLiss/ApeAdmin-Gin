@@ -50,6 +50,9 @@ type SysMenu struct {
 	Sort       int    `gorm:"default:0" json:"sort"`
 	Visible    int    `gorm:"default:1" json:"visible"`
 	Status     int    `gorm:"default:1" json:"status"`
+	// I18nKey 国际化键，指向前端 locales 菜单字典（如 menu.system.user）
+	// 前端渲染时 te(key) 存在则 t(key)，否则回退 Name（中文）
+	I18nKey string `gorm:"size:100" json:"i18n_key"`
 }
 
 func (SysMenu) TableName() string { return "sys_menu" }

@@ -49,7 +49,7 @@ func RateLimit(name string, rpm int, window time.Duration) gin.HandlerFunc {
 			retryAfter := int(1 / refillRate)
 			if retryAfter < 1 { retryAfter = 1 }
 			c.Header("Retry-After", time.Duration(retryAfter).String())
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, response.Error(429, "请求过于频繁，请稍后再试"))
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, response.ErrorCtx(c, 429, "auth.rate_limited", nil))
 			return
 		}
 		bucket.tokens--

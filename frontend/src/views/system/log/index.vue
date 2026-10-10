@@ -2,7 +2,7 @@
   <el-card shadow="never" class="page-card">
     <!-- Toolbar -->
     <div class="toolbar">
-      <el-select v-model="query.method" placeholder="请求方法" clearable style="width: 130px" @change="fetchData">
+      <el-select v-model="query.method" :placeholder="t('system.log.methodPlaceholder')" clearable style="width: 130px" @change="fetchData">
         <el-option label="GET" value="GET" />
         <el-option label="POST" value="POST" />
         <el-option label="PUT" value="PUT" />
@@ -10,51 +10,51 @@
       </el-select>
       <el-input
         v-model="query.path"
-        placeholder="搜索路径"
+        :placeholder="t('system.log.pathPlaceholder')"
         clearable
         style="width: 220px"
         @keyup.enter="fetchData"
       />
-      <el-select v-model="query.status_code" placeholder="状态码" clearable style="width: 130px" @change="fetchData">
-        <el-option label="2xx 成功" :value="200" />
-        <el-option label="4xx 客户端错误" :value="400" />
-        <el-option label="5xx 服务器错误" :value="500" />
+      <el-select v-model="query.status_code" :placeholder="t('system.log.statusCode')" clearable style="width: 150px" @change="fetchData">
+        <el-option :label="t('system.log.statusCode2xx')" :value="200" />
+        <el-option :label="t('system.log.statusCode4xx')" :value="400" />
+        <el-option :label="t('system.log.statusCode5xx')" :value="500" />
       </el-select>
       <el-button type="primary" @click="fetchData">
-        <el-icon><Search /></el-icon>查询
+        <el-icon><Search /></el-icon>{{ t('common.actions.query') }}
       </el-button>
       <el-button type="danger" @click="handleClear" v-if="hasDeletePerm">
-        <el-icon><Delete /></el-icon>清空日志
+        <el-icon><Delete /></el-icon>{{ t('system.log.clearLogs') }}
       </el-button>
     </div>
 
     <!-- Table -->
     <el-table :data="list" v-loading="loading" stripe>
       <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column label="用户" min-width="100">
+      <el-table-column :label="t('system.log.operator')" min-width="100">
         <template #default="{ row }">{{ row.username || '-' }}</template>
       </el-table-column>
-      <el-table-column label="方法" width="80">
+      <el-table-column :label="t('system.log.method')" width="80">
         <template #default="{ row }">
           <el-tag :type="methodTagType(row.method)" size="small">{{ row.method }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="path" label="路径" min-width="200" show-overflow-tooltip />
-      <el-table-column label="状态码" width="90">
+      <el-table-column prop="path" :label="t('system.log.path')" min-width="200" show-overflow-tooltip />
+      <el-table-column :label="t('system.log.statusCode')" width="90">
         <template #default="{ row }">
           <el-tag :type="statusTagType(row.status_code)" size="small">{{ row.status_code }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="耗时" width="90">
+      <el-table-column :label="t('system.log.responseTime')" width="90">
         <template #default="{ row }">{{ row.duration_ms }}ms</template>
       </el-table-column>
-      <el-table-column prop="ip" label="IP" width="130" />
-      <el-table-column label="时间" width="170">
+      <el-table-column prop="ip" :label="t('system.log.ip')" width="130" />
+      <el-table-column :label="t('system.log.createTime')" width="170">
         <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="80" fixed="right">
+      <el-table-column :label="t('common.actions.operation')" width="80" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+          <el-button link type="primary" @click="openDetail(row)">{{ t('common.actions.detail') }}</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -72,29 +72,29 @@
   </el-card>
 
   <!-- Detail Dialog -->
-  <el-dialog v-model="detailVisible" title="日志详情" width="640px">
+  <el-dialog v-model="detailVisible" :title="t('system.log.detail')" width="640px">
     <el-descriptions :column="2" border>
       <el-descriptions-item label="ID">{{ detail.id }}</el-descriptions-item>
-      <el-descriptions-item label="用户">{{ detail.username || '-' }}</el-descriptions-item>
-      <el-descriptions-item label="用户ID">{{ detail.user_id || '-' }}</el-descriptions-item>
-      <el-descriptions-item label="请求方法">{{ detail.method }}</el-descriptions-item>
-      <el-descriptions-item label="路径" :span="2">{{ detail.path }}</el-descriptions-item>
-      <el-descriptions-item label="状态码">{{ detail.status_code }}</el-descriptions-item>
-      <el-descriptions-item label="耗时">{{ detail.duration_ms }}ms</el-descriptions-item>
-      <el-descriptions-item label="IP">{{ detail.ip || '-' }}</el-descriptions-item>
-      <el-descriptions-item label="时间">{{ formatTime(detail.created_at) }}</el-descriptions-item>
-      <el-descriptions-item label="参数" :span="2">
+      <el-descriptions-item :label="t('system.log.operator')">{{ detail.username || '-' }}</el-descriptions-item>
+      <el-descriptions-item :label="t('system.log.userId')">{{ detail.user_id || '-' }}</el-descriptions-item>
+      <el-descriptions-item :label="t('system.log.method')">{{ detail.method }}</el-descriptions-item>
+      <el-descriptions-item :label="t('system.log.path')" :span="2">{{ detail.path }}</el-descriptions-item>
+      <el-descriptions-item :label="t('system.log.statusCode')">{{ detail.status_code }}</el-descriptions-item>
+      <el-descriptions-item :label="t('system.log.responseTime')">{{ detail.duration_ms }}ms</el-descriptions-item>
+      <el-descriptions-item :label="t('system.log.ip')">{{ detail.ip || '-' }}</el-descriptions-item>
+      <el-descriptions-item :label="t('system.log.createTime')">{{ formatTime(detail.created_at) }}</el-descriptions-item>
+      <el-descriptions-item :label="t('system.log.params')" :span="2">
         <pre class="log-pre">{{ detail.params || '-' }}</pre>
       </el-descriptions-item>
-      <el-descriptions-item label="User-Agent" :span="2">{{ detail.user_agent || '-' }}</el-descriptions-item>
-      <el-descriptions-item label="错误" :span="2">
+      <el-descriptions-item :label="t('system.log.userAgent')" :span="2">{{ detail.user_agent || '-' }}</el-descriptions-item>
+      <el-descriptions-item :label="t('system.log.error')" :span="2">
         <span v-if="detail.error" class="log-error">{{ detail.error }}</span>
         <span v-else>-</span>
       </el-descriptions-item>
     </el-descriptions>
     <template #footer>
-      <el-button v-if="hasDeletePerm" type="danger" @click="handleDeleteOne(detail)">删除此条</el-button>
-      <el-button @click="detailVisible = false">关闭</el-button>
+      <el-button v-if="hasDeletePerm" type="danger" @click="handleDeleteOne(detail)">{{ t('system.log.deleteOne') }}</el-button>
+      <el-button @click="detailVisible = false">{{ t('common.actions.close') }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -102,8 +102,11 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { getLogs, getLogDetail, deleteLog, clearLogs } from '@/api'
 import { useUserStore } from '@/stores/user'
+
+const { t } = useI18n()
 
 interface LogRow {
   id: number
@@ -179,17 +182,17 @@ async function openDetail(row: LogRow) {
 
 async function handleDeleteOne(row: Partial<LogRow>) {
   if (!row.id) return
-  await ElMessageBox.confirm('确定删除这条日志吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('system.log.deleteOneConfirm'), t('system.log.deleteTitle'), { type: 'warning' })
   await deleteLog(row.id)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('common.feedback.deleteSuccess'))
   detailVisible.value = false
   fetchData()
 }
 
 async function handleClear() {
-  await ElMessageBox.confirm('确定清空所有日志吗？此操作不可恢复！', '警告', { type: 'warning' })
+  await ElMessageBox.confirm(t('system.log.clearConfirm'), t('system.log.clearTitle'), { type: 'warning' })
   await clearLogs()
-  ElMessage.success('已清空所有日志')
+  ElMessage.success(t('system.log.cleared'))
   fetchData()
 }
 

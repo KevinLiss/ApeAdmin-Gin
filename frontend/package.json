@@ -24,6 +24,7 @@
     "vue": "^3.5.13",
     "vue-clipboard3": "^2.0.0",
     "vue-echarts": "^6.7.3",
+    "vue-i18n": "^11.4.13",
     "vue-router": "^4.5.0",
     "vue3-verify": "^0.0.3",
     "vuedraggable": "^4.1.0"

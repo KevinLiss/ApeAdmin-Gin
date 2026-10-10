@@ -44,6 +44,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import ApeSidebar from '@/components/ApeSidebar.vue'
 import ApeHeader from '@/components/ApeHeader.vue'
 import { useUserStore } from '@/stores/user'
@@ -54,6 +55,7 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const settingsStore = useSettingsStore()
+const { t } = useI18n()
 
 const collapsed = ref(false)
 const isMobile = ref(false)
@@ -109,11 +111,11 @@ onUnmounted(() => {
 
 function toggleTheme() {
   const dark = toggleDark()
-  ElMessage.info(dark ? '已切换深色模式' : '已切换浅色模式')
+  ElMessage.info(dark ? t('common.feedback.darkModeOn') : t('common.feedback.lightModeOn'))
 }
 
 function onUpgrade() {
-  ElMessage.info('升级功能开发中，敬请期待')
+  ElMessage.info(t('common.app.notificationCenter'))
 }
 
 function onProfile() {
@@ -126,7 +128,7 @@ function onSettings() {
 
 async function onLogout() {
   await userStore.logout()
-  ElMessage.success('已退出登录')
+  ElMessage.success(t('common.feedback.logoutSuccess'))
   router.push('/login')
 }
 </script>

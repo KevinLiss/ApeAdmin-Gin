@@ -82,14 +82,15 @@ func BatchUpdateSettings(settings map[string]string) error {
 }
 
 // brandSettingKeys 品牌/外观类设置 key，需通过公共接口暴露给未登录前端
+// admin_path/sidebar_theme 为私密项（与 Python 版对齐），仅登录后可读写
 var brandSettingKeys = map[string]bool{
-	"site_name":      true,
-	"logo_url":       true,
-	"primary_color":  true,
-	"footer_text":    true,
-	"login_bg":       true,
-	"admin_path":     true,
-	"sidebar_theme":  true,
+	"site_name":     true,
+	"logo_url":      true,
+	"primary_color": true,
+	"footer_text":   true,
+	"login_bg":      true,
+	"site_url":      true,
+	"theme_mode":    true,
 }
 
 func isBrandSettingKey(key string) bool { return brandSettingKeys[key] }

@@ -14,7 +14,7 @@ func RequirePermission(permission string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userVal, exists := c.Get("user")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Error(401, "请先登录"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.ErrorCtx(c, 401, "auth.not_logged_in", nil))
 			return
 		}
 		u := userVal.(*model.SysUser)
@@ -28,7 +28,7 @@ func RequirePermission(permission string) gin.HandlerFunc {
 		// 收集用户权限集合
 		perms := service.GetUserPermissions(u.ID)
 		if !perms[permission] && !perms["*"] {
-			c.AbortWithStatusJSON(http.StatusForbidden, response.Error(403, "无权限: "+permission))
+			c.AbortWithStatusJSON(http.StatusForbidden, response.ErrorCtx(c, 403, "perm.denied", map[string]string{"permission": permission}))
 			return
 		}
 		c.Next()

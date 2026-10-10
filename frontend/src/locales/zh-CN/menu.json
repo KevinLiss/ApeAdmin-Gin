@@ -1,0 +1,59 @@
+{
+  "dashboard": "仪表盘",
+  "profile": "个人中心",
+  "system": {
+    "label": "系统管理",
+    "user": "用户管理",
+    "role": "角色管理",
+    "menu": "菜单管理",
+    "dept": "部门管理",
+    "log": "操作日志",
+    "settings": "系统设置",
+    "userAdd": "用户新增",
+    "userEdit": "用户编辑",
+    "userDelete": "用户删除",
+    "userResetPassword": "重置密码",
+    "roleAdd": "角色新增",
+    "roleEdit": "角色编辑",
+    "roleDelete": "角色删除",
+    "menuAdd": "菜单新增",
+    "menuEdit": "菜单编辑",
+    "menuDelete": "菜单删除",
+    "deptAdd": "部门新增",
+    "deptEdit": "部门编辑",
+    "deptDelete": "部门删除",
+    "logDelete": "日志删除",
+    "settingsEdit": "设置编辑",
+    "i18nLocale": "语言管理",
+    "i18nTranslation": "翻译维护",
+    "i18nLocaleAdd": "语言新增",
+    "i18nLocaleEdit": "语言编辑",
+    "i18nLocaleDelete": "语言删除"
+  },
+  "plugin": {
+    "label": "插件管理",
+    "import": "插件上传",
+    "toggle": "插件启停",
+    "config": "插件配置",
+    "delete": "插件删除",
+    "restart": "插件重启"
+  },
+  "mcp": {
+    "label": "MCP 管理",
+    "tools": "工具管理",
+    "resources": "资源管理",
+    "prompts": "提示词管理",
+    "auditLogs": "审计日志",
+    "toolCall": "MCP 调用"
+  },
+  "ai": {
+    "label": "AI 对话",
+    "chat": "对话助手",
+    "providers": "模型密钥管理"
+  },
+  "devExample": {
+    "label": "开发示例",
+    "notes": "备忘录管理"
+  },
+  "file": "文件管理"
+}

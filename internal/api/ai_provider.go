@@ -100,19 +100,19 @@ func (h *AiHandler) CreateProvider(c *gin.Context) {
 		Remark       string   `json:"remark"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	db := core.GetDB()
 	var count int64
 	db.Model(&model.SysAiProvider{}).Where("name = ?", req.Name).Count(&count)
 	if count > 0 {
-		c.JSON(http.StatusConflict, response.Error(409, "供应商已存在"))
+		c.JSON(http.StatusConflict, response.ErrorCtx(c, 409, "ai.provider_exists", nil))
 		return
 	}
 	enc, err := utils.EncryptSecret(getSecret(), req.APIKey)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "密钥加密失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "ai.key_encrypt_fail", nil))
 		return
 	}
 	modelsJSON, _ := marshalJSON(req.Models)
@@ -134,7 +134,7 @@ func (h *AiHandler) CreateProvider(c *gin.Context) {
 func (h *AiHandler) UpdateProvider(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	if id == 0 {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 var req struct {
@@ -148,13 +148,13 @@ var req struct {
 		Remark       string   `json:"remark"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	db := core.GetDB()
 	var p model.SysAiProvider
 	if err := db.First(&p, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "供应商不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "ai.provider_missing", nil))
 		return
 	}
 	updates := map[string]interface{}{}
@@ -180,7 +180,7 @@ var req struct {
 	if req.APIKey != "" {
 		enc, err := utils.EncryptSecret(getSecret(), req.APIKey)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, response.Error(500, "密钥加密失败"))
+			c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "ai.key_encrypt_fail", nil))
 			return
 		}
 		updates["api_key_enc"] = enc
@@ -189,40 +189,40 @@ var req struct {
 		updates["enabled"] = *req.Enabled == 1
 	}
 	db.Model(&p).Updates(updates)
-	c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.update_ok", nil))
 }
 
 // DeleteProvider 删除供应商（硬删除）
 func (h *AiHandler) DeleteProvider(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	if id == 0 {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	db := core.GetDB()
 	if err := db.Unscoped().Delete(&model.SysAiProvider{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "删除失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.delete_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("删除成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.delete_ok", nil))
 }
 
 // TestProvider 测试连通性（调用 /models 端点）
 func (h *AiHandler) TestProvider(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 	if id == 0 {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	db := core.GetDB()
 	var p model.SysAiProvider
 	if err := db.First(&p, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "供应商不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "ai.provider_missing", nil))
 		return
 	}
 	apiKey, err := utils.DecryptSecret(getSecret(), p.ApiKeyEnc)
 	if err != nil {
-		c.JSON(http.StatusOK, response.Success(map[string]interface{}{"ok": false, "error": "密钥解密失败"}))
+		c.JSON(http.StatusOK, response.Success(map[string]interface{}{"ok": false, "error": T(c, "ai.key_decrypt_fail")}))
 		return
 	}
 	baseURL := p.BaseURL

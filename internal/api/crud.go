@@ -23,7 +23,7 @@ func (h *RoleHandler) List(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	roles, total, err := dal.ListRoles(page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "查询失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.query_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.SuccessPage(roles, total, page, pageSize))
@@ -32,7 +32,7 @@ func (h *RoleHandler) List(c *gin.Context) {
 func (h *RoleHandler) ListAll(c *gin.Context) {
 	roles, err := dal.ListAllRoles()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "查询失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.query_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(roles))
@@ -42,7 +42,7 @@ func (h *RoleHandler) Get(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	role, err := dal.GetRoleByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "角色不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "role.not_found", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(role))
@@ -59,7 +59,7 @@ func (h *RoleHandler) Create(c *gin.Context) {
 		Status    int    `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	role := model.SysRole{
@@ -73,7 +73,7 @@ func (h *RoleHandler) Create(c *gin.Context) {
 	if role.Status == 0 { role.Status = 1 }
 	if role.DataScope == 0 { role.DataScope = 1 }
 	if err := dal.CreateRole(&role); err != nil {
-		c.JSON(http.StatusConflict, response.Error(409, "角色编码已存在"))
+		c.JSON(http.StatusConflict, response.ErrorCtx(c, 409, "role.code_exists", nil))
 		return
 	}
 	if len(req.MenuIDs) > 0 {
@@ -86,7 +86,7 @@ func (h *RoleHandler) Update(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	role, err := dal.GetRoleByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "角色不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "role.not_found", nil))
 		return
 	}
 	var req struct {
@@ -98,7 +98,7 @@ func (h *RoleHandler) Update(c *gin.Context) {
 		Status    *int   `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	if req.Name != "" { role.Name = req.Name }
@@ -107,22 +107,22 @@ func (h *RoleHandler) Update(c *gin.Context) {
 	role.Remark = req.Remark
 	if req.Status != nil { role.Status = *req.Status }
 	if err := dal.UpdateRole(role); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "更新失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.update_fail", nil))
 		return
 	}
 	if req.MenuIDs != nil {
 		dal.AssignRoleMenus(role.ID, req.MenuIDs)
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.update_ok", nil))
 }
 
 func (h *RoleHandler) Delete(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err := dal.DeleteRole(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "删除失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.delete_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("删除成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.delete_ok", nil))
 }
 
 // ─── 菜单 ───
@@ -132,7 +132,7 @@ type MenuHandler struct{}
 func (h *MenuHandler) Tree(c *gin.Context) {
 	menus, err := dal.GetMenuTree()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "查询失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.query_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(menus))
@@ -141,13 +141,13 @@ func (h *MenuHandler) Tree(c *gin.Context) {
 func (h *MenuHandler) Create(c *gin.Context) {
 	var menu model.SysMenu
 	if err := c.ShouldBindJSON(&menu); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	if menu.Status == 0 { menu.Status = 1 }
 	if menu.Visible == 0 { menu.Visible = 1 }
 	if err := dal.CreateMenu(&menu); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "创建失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.create_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(menu))
@@ -157,24 +157,24 @@ func (h *MenuHandler) Update(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var m model.SysMenu
 	if err := c.ShouldBindJSON(&m); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	m.ID = uint(id)
 	if err := dal.UpdateMenu(&m); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "更新失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.update_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.update_ok", nil))
 }
 
 func (h *MenuHandler) Delete(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err := dal.DeleteMenu(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "删除失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.delete_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("删除成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.delete_ok", nil))
 }
 
 // ─── 部门 ───
@@ -184,7 +184,7 @@ type DeptHandler struct{}
 func (h *DeptHandler) Tree(c *gin.Context) {
 	depts, err := dal.GetAllDepts()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "查询失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.query_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(depts))
@@ -193,12 +193,12 @@ func (h *DeptHandler) Tree(c *gin.Context) {
 func (h *DeptHandler) Create(c *gin.Context) {
 	var dept model.SysDept
 	if err := c.ShouldBindJSON(&dept); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	if dept.Status == 0 { dept.Status = 1 }
 	if err := dal.CreateDept(&dept); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "创建失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.create_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(dept))
@@ -208,24 +208,24 @@ func (h *DeptHandler) Update(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	var dept model.SysDept
 	if err := c.ShouldBindJSON(&dept); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	dept.ID = uint(id)
 	if err := dal.UpdateDept(&dept); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "更新失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.update_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.update_ok", nil))
 }
 
 func (h *DeptHandler) Delete(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err := dal.DeleteDept(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "删除失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.delete_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("删除成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.delete_ok", nil))
 }
 
 // ─── 日志 ───
@@ -237,7 +237,7 @@ func (h *LogHandler) List(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	logs, total, err := dal.ListLogs(page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "查询失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.query_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.SuccessPage(logs, total, page, pageSize))
@@ -247,7 +247,7 @@ func (h *LogHandler) Get(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	log, err := dal.GetLogByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "日志不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "log.not_found", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(log))
@@ -255,19 +255,19 @@ func (h *LogHandler) Get(c *gin.Context) {
 
 func (h *LogHandler) Clear(c *gin.Context) {
 	if err := dal.ClearLogs(); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "清空失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.clear_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("清空成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.clear_ok", nil))
 }
 
 func (h *LogHandler) Delete(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err := dal.DeleteLog(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "删除失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.delete_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("删除成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.delete_ok", nil))
 }
 
 // ─── 系统设置 ───
@@ -277,7 +277,7 @@ type SettingHandler struct{}
 func (h *SettingHandler) List(c *gin.Context) {
 	settings, err := dal.ListSettings()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "查询失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.query_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(settings))
@@ -286,14 +286,14 @@ func (h *SettingHandler) List(c *gin.Context) {
 func (h *SettingHandler) BatchUpdate(c *gin.Context) {
 	var req map[string]string
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	if err := dal.BatchUpdateSettings(req); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "更新失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.update_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.update_ok", nil))
 }
 
 func (h *SettingHandler) Update(c *gin.Context) {
@@ -302,27 +302,27 @@ func (h *SettingHandler) Update(c *gin.Context) {
 		Value string `json:"value" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	if err := dal.UpdateSetting(key, req.Value); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "更新失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.update_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.update_ok", nil))
 }
 
 // BrandImage 品牌图片上传（Logo / 登录页背景），返回可访问的 URL
 func (h *SettingHandler) BrandImage(c *gin.Context) {
 	cfg := core.GetConfig()
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "配置未初始化"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.config_missing", nil))
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "缺少文件字段 file"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.file_missing", nil))
 		return
 	}
 
@@ -330,26 +330,26 @@ func (h *SettingHandler) BrandImage(c *gin.Context) {
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true, ".svg": true, ".ico": true}
 	if !allowed[ext] {
-		c.JSON(http.StatusBadRequest, response.Error(400, "仅支持图片格式（jpg/png/gif/webp/svg/ico）"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "file.image_only", nil))
 		return
 	}
 
 	// 大小校验（10MB）
 	if file.Size > 10*1024*1024 {
-		c.JSON(http.StatusBadRequest, response.Error(400, "图片大小不能超过 10MB"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "file.image_too_large", nil))
 		return
 	}
 
 	// 保存到 uploads/brand/ 目录
 	dir := filepath.Join(cfg.File.StorageDir, "brand")
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "创建目录失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "file.mkdir_fail", nil))
 		return
 	}
 	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
 	dst := filepath.Join(dir, filename)
 	if err := c.SaveUploadedFile(file, dst); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "保存文件失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "file.write_fail", nil))
 		return
 	}
 

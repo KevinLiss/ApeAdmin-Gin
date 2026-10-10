@@ -15,19 +15,19 @@ func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
 		if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Error(401, "请先登录"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.ErrorCtx(c, 401, "auth.not_logged_in", nil))
 			return
 		}
 		tokenString := strings.TrimPrefix(auth, "Bearer ")
 		claims, err := core.ParseToken(tokenString)
 		if err != nil || claims.Type != "access" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Error(401, "登录已过期，请重新登录"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.ErrorCtx(c, 401, "auth.login_expired", nil))
 			return
 		}
 
 		userID, err := core.GetUserIDFromClaims(claims)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Error(401, "登录状态异常"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.ErrorCtx(c, 401, "auth.login_abnormal", nil))
 			return
 		}
 
@@ -37,7 +37,7 @@ func JWTAuth() gin.HandlerFunc {
 			tokenStore := core.GetTokenStore()
 			if tokenStore != nil {
 				if revoked, _ := tokenStore.IsRevoked(c.Request.Context(), claims.ID); revoked {
-					c.AbortWithStatusJSON(http.StatusUnauthorized, response.Error(401, "登录已失效"))
+					c.AbortWithStatusJSON(http.StatusUnauthorized, response.ErrorCtx(c, 401, "auth.login_invalid", nil))
 					return
 				}
 			}
@@ -46,11 +46,11 @@ func JWTAuth() gin.HandlerFunc {
 		// 查库验证用户状态 + 版本号校验
 		user, err := dal.GetUserByID(userID)
 		if err != nil || user.Status != 1 {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Error(401, "用户不存在或已禁用"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.ErrorCtx(c, 401, "auth.user_disabled", nil))
 			return
 		}
 		if user.TokenVersion != claims.TokenVersion {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, response.Error(401, "登录状态已失效，请重新登录"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response.ErrorCtx(c, 401, "auth.login_invalid", nil))
 			return
 		}
 

@@ -142,16 +142,16 @@ func resolveProvider(providerID uint) (*model.SysAiProvider, error) {
 	if providerID > 0 {
 		var p model.SysAiProvider
 		if err := gdb.First(&p, providerID).Error; err != nil {
-			return nil, fmt.Errorf("指定的模型供应商不存在")
+			return nil, fmt.Errorf("%s", core.T(core.DefaultLocale(), "ai.provider_missing", nil))
 		}
 		if !p.Enabled {
-			return nil, fmt.Errorf("该模型供应商已被禁用")
+			return nil, fmt.Errorf("%s", core.T(core.DefaultLocale(), "ai.provider_disabled", nil))
 		}
 		return &p, nil
 	}
 	var p model.SysAiProvider
 	if err := gdb.Where("enabled = ?", true).Order("sort ASC, id ASC").First(&p).Error; err != nil {
-		return nil, fmt.Errorf("未配置任何可用的模型供应商，请先在「模型密钥管理」中添加")
+		return nil, fmt.Errorf("%s", core.T(core.DefaultLocale(), "ai.no_provider", nil))
 	}
 	return &p, nil
 }
@@ -165,12 +165,12 @@ func (h *AiHandler) Chat(c *gin.Context) {
 		EnableTools bool                `json:"enable_tools"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	provider, err := resolveProvider(req.ProviderID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, err.Error()))
+		c.JSON(http.StatusBadRequest, response.Body{Code: 400, Msg: err.Error()})
 		return
 	}
 	// 非流式复用流式逻辑不可行（需完整工具循环），这里做简化：仅透传一次 LLM 调用
@@ -191,7 +191,7 @@ func (h *AiHandler) ChatStream(c *gin.Context) {
 		EnableTools bool                `json:"enable_tools"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	provider, err := resolveProvider(req.ProviderID)

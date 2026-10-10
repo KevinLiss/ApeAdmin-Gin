@@ -80,7 +80,7 @@ func (h *AiHandler) GetSessionMessages(c *gin.Context) {
 	db := core.GetDB()
 	var s model.SysChatSession
 	if err := db.Where("id = ? AND user_id = ?", sessionID, userID).First(&s).Error; err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "会话不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "ai.session_missing", nil))
 		return
 	}
 	var msgs []model.SysChatMessage
@@ -117,13 +117,13 @@ func (h *AiHandler) RenameSession(c *gin.Context) {
 		Title string `json:"title" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	db := core.GetDB()
 	var s model.SysChatSession
 	if err := db.Where("id = ? AND user_id = ?", sessionID, userID).First(&s).Error; err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "会话不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "ai.session_missing", nil))
 		return
 	}
 	title := strings.TrimSpace(req.Title)
@@ -145,12 +145,12 @@ func (h *AiHandler) DeleteSession(c *gin.Context) {
 	db := core.GetDB()
 	var s model.SysChatSession
 	if err := db.Where("id = ? AND user_id = ?", sessionID, userID).First(&s).Error; err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "会话不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "ai.session_missing", nil))
 		return
 	}
 	db.Where("session_id = ?", s.ID).Delete(&model.SysChatMessage{})
 	db.Delete(&s)
-	c.JSON(http.StatusOK, response.SuccessMsg("会话已删除"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "ai.session_deleted", nil))
 }
 
 // AppendMessage 追加消息到会话
@@ -163,17 +163,17 @@ func (h *AiHandler) AppendMessage(c *gin.Context) {
 		ToolEvents []interface{} `json:"tool_events"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	db := core.GetDB()
 	var s model.SysChatSession
 	if err := db.Where("id = ? AND user_id = ?", sessionID, userID).First(&s).Error; err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "会话不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "ai.session_missing", nil))
 		return
 	}
 	if req.Role != "user" && req.Role != "assistant" {
-		c.JSON(http.StatusBadRequest, response.Error(400, "role 必须为 user 或 assistant"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "ai.role_invalid", nil))
 		return
 	}
 	toolEventsJSON := ""
@@ -224,7 +224,7 @@ func defaultBaseURL(providerType string) string {
 // fetchModels 调用供应商 /models 端点拉取模型列表
 func fetchModels(baseURL, apiKey string) ([]string, error) {
 	if baseURL == "" {
-		return nil, fmt.Errorf("未配置 API 地址")
+		return nil, fmt.Errorf("%s", core.T(core.DefaultLocale(), "ai.base_url_required", nil))
 	}
 	client := &http.Client{Timeout: 15 * time.Second}
 	url := strings.TrimRight(baseURL, "/") + "/models"

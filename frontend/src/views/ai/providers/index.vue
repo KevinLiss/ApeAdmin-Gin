@@ -3,47 +3,47 @@
     <!-- Toolbar -->
     <div class="toolbar">
       <el-button type="success" @click="openDialog()">
-        <el-icon><Plus /></el-icon>新增模型密钥
+        <el-icon><Plus /></el-icon>{{ t('system.ai.providers.add') }}
       </el-button>
       <el-button type="primary" @click="fetchData">
-        <el-icon><Refresh /></el-icon>刷新
+        <el-icon><Refresh /></el-icon>{{ t('common.actions.refresh') }}
       </el-button>
     </div>
 
     <!-- Table -->
     <el-table :data="list" v-loading="loading" stripe>
       <el-table-column prop="id" label="ID" width="60" />
-      <el-table-column prop="name" label="供应商名称" min-width="140" />
-      <el-table-column label="类型" width="100">
+      <el-table-column prop="name" :label="t('system.ai.providers.name')" min-width="140" />
+      <el-table-column :label="t('system.ai.providers.type')" width="100">
         <template #default="{ row }">
           <el-tag :type="providerTagType(row.provider_type)" size="small">
             {{ providerTypeLabel(row.provider_type) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="base_url" label="API 地址" min-width="240" show-overflow-tooltip />
-      <el-table-column label="模型" min-width="200">
+      <el-table-column prop="base_url" :label="t('system.ai.providers.baseUrl')" min-width="240" show-overflow-tooltip />
+      <el-table-column :label="t('system.ai.providers.models')" min-width="200">
         <template #default="{ row }">
           <el-tag v-for="m in row.models" :key="m" size="small" class="model-tag">{{ m }}</el-tag>
           <span v-if="!row.models?.length">—</span>
         </template>
       </el-table-column>
       <el-table-column prop="api_key_masked" label="API Key" width="180" />
-      <el-table-column label="状态" width="80">
+      <el-table-column :label="t('system.ai.providers.enabled')" width="80">
         <template #default="{ row }">
           <el-tag :type="row.enabled === 1 ? 'success' : 'info'" size="small">
-            {{ row.enabled === 1 ? '启用' : '禁用' }}
+            {{ row.enabled === 1 ? t('common.status.enabled') : t('common.status.disabled') }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="sort" label="排序" width="70" />
-      <el-table-column label="操作" width="230" fixed="right">
+      <el-table-column prop="sort" :label="t('system.ai.providers.sort')" width="70" />
+      <el-table-column :label="t('common.actions.operation')" width="230" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="handleTest(row)">
-            <el-icon><Connection /></el-icon>测试
+            <el-icon><Connection /></el-icon>{{ t('system.ai.providers.test') }}
           </el-button>
-          <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
-          <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+          <el-button link type="primary" @click="openDialog(row)">{{ t('common.actions.edit') }}</el-button>
+          <el-button link type="danger" @click="handleDelete(row)">{{ t('common.actions.delete') }}</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -63,74 +63,74 @@
   <!-- Dialog -->
   <el-dialog
     v-model="dialogVisible"
-    :title="editingId ? '编辑模型密钥' : '新增模型密钥'"
+    :title="editingId ? t('system.ai.providers.edit') : t('system.ai.providers.add')"
     width="560px"
     @closed="resetForm"
   >
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-      <el-form-item label="供应商名称" prop="name">
-        <el-input v-model="form.name" placeholder="如：DeepSeek 生产环境" />
+      <el-form-item :label="t('system.ai.providers.name')" prop="name">
+        <el-input v-model="form.name" :placeholder="t('system.ai.providers.namePlaceholder')" />
       </el-form-item>
-      <el-form-item label="类型" prop="provider_type">
-        <el-select v-model="form.provider_type" placeholder="选择类型" style="width: 100%" @change="onTypeChange">
+      <el-form-item :label="t('system.ai.providers.type')" prop="provider_type">
+        <el-select v-model="form.provider_type" :placeholder="t('system.ai.providers.typePlaceholder')" style="width: 100%" @change="onTypeChange">
           <el-option label="DeepSeek" value="deepseek" />
-          <el-option label="通义千问 (Qwen)" value="qwen" />
-          <el-option label="智谱 GLM" value="glm" />
+          <el-option :label="t('system.ai.providers.typeQwen')" value="qwen" />
+          <el-option :label="t('system.ai.providers.typeGlm')" value="glm" />
           <el-option label="OpenAI" value="openai" />
-          <el-option label="自定义 (Custom)" value="custom" />
+          <el-option :label="t('system.ai.providers.typeCustom')" value="custom" />
         </el-select>
       </el-form-item>
-      <el-form-item label="API Key" prop="api_key">
+      <el-form-item :label="t('system.ai.providers.apiKey')" prop="api_key">
         <el-input
           v-model="form.api_key"
           type="password"
           show-password
-          :placeholder="editingId ? '留空则不修改' : '请输入 API Key'"
+          :placeholder="editingId ? t('system.ai.providers.apiKeyEditTip') : t('system.ai.providers.apiKeyPlaceholder')"
         />
       </el-form-item>
-      <el-form-item label="API 地址" prop="base_url">
-        <el-input v-model="form.base_url" placeholder="如：https://api.deepseek.com" />
+      <el-form-item :label="t('system.ai.providers.baseUrl')" prop="base_url">
+        <el-input v-model="form.base_url" :placeholder="t('system.ai.providers.baseUrlPlaceholder')" />
       </el-form-item>
-      <el-form-item label="模型列表" prop="models">
+      <el-form-item :label="t('system.ai.providers.models')" prop="models">
         <div class="models-editor">
           <div v-for="(m, i) in form.models" :key="i" class="model-row">
-            <el-input v-model="form.models[i]" placeholder="模型名称" />
+            <el-input v-model="form.models[i]" :placeholder="t('system.ai.providers.modelPlaceholder')" />
             <el-button link type="danger" @click="form.models.splice(i, 1)">
               <el-icon><Delete /></el-icon>
             </el-button>
           </div>
           <el-button size="small" @click="form.models.push('')">
-            <el-icon><Plus /></el-icon>添加模型
+            <el-icon><Plus /></el-icon>{{ t('system.ai.providers.addModel') }}
           </el-button>
         </div>
       </el-form-item>
-      <el-form-item label="启用状态">
+      <el-form-item :label="t('system.ai.providers.enabled')">
         <el-switch v-model="form.enabled" :active-value="1" :inactive-value="0" />
       </el-form-item>
-      <el-form-item label="排序">
+      <el-form-item :label="t('system.ai.providers.sort')">
         <el-input-number v-model="form.sort" :min="0" :max="999" />
       </el-form-item>
-      <el-form-item label="备注">
-        <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="可选" />
+      <el-form-item :label="t('system.ai.providers.remark')">
+        <el-input v-model="form.remark" type="textarea" :rows="2" :placeholder="t('system.ai.providers.remarkPlaceholder')" />
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
+      <el-button @click="dialogVisible = false">{{ t('common.actions.cancel') }}</el-button>
+      <el-button type="primary" :loading="saving" @click="handleSave">{{ t('common.actions.save') }}</el-button>
     </template>
   </el-dialog>
 
   <!-- Test Result Dialog -->
-  <el-dialog v-model="testResultVisible" title="连通性测试" width="420px">
+  <el-dialog v-model="testResultVisible" :title="t('system.ai.providers.testTitle')" width="420px">
     <div v-if="testLoading" class="test-loading">
       <el-icon class="is-loading" :size="24"><Loading /></el-icon>
-      <span>正在测试连通性...</span>
+      <span>{{ t('system.ai.providers.testing') }}</span>
     </div>
     <div v-else class="test-result">
       <el-result
         :icon="testResult.ok ? 'success' : 'error'"
-        :title="testResult.ok ? '连通成功' : '连通失败'"
-        :sub-title="testResult.ok ? `可用模型 ${testResult.models?.length || 0} 个` : testResult.error || ''"
+        :title="testResult.ok ? t('system.ai.providers.testSuccess') : t('system.ai.providers.testFailed')"
+        :sub-title="testResult.ok ? t('system.ai.providers.testModels', { count: testResult.models?.length || 0 }) : testResult.error || ''"
       />
       <div v-if="testResult.ok && testResult.models?.length" class="test-models">
         <el-tag v-for="m in testResult.models" :key="m" size="small" class="model-tag">{{ m }}</el-tag>
@@ -141,9 +141,12 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { getProviders, createProvider, updateProvider, deleteProvider, testProvider } from '@/api'
+
+const { t } = useI18n()
 
 interface ProviderRow {
   id: number
@@ -179,8 +182,8 @@ const form = reactive({
 })
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入供应商名称', trigger: 'blur' }],
-  provider_type: [{ required: true, message: '请选择类型', trigger: 'change' }],
+  name: [{ required: true, message: () => t('system.ai.providers.nameRequired'), trigger: 'blur' }],
+  provider_type: [{ required: true, message: () => t('system.ai.providers.typeRequired'), trigger: 'change' }],
 }
 
 // Test dialog
@@ -207,10 +210,10 @@ function onTypeChange(type: string) {
 function providerTypeLabel(type: string): string {
   const labels: Record<string, string> = {
     deepseek: 'DeepSeek',
-    qwen: '通义千问',
-    glm: '智谱GLM',
+    qwen: t('system.ai.providers.typeQwenShort'),
+    glm: t('system.ai.providers.typeGlmShort'),
     openai: 'OpenAI',
-    custom: '自定义',
+    custom: t('system.ai.providers.typeCustomShort'),
   }
   return labels[type] || type
 }
@@ -285,10 +288,10 @@ async function handleSave() {
         }
         if (form.api_key) payload.api_key = form.api_key
         await updateProvider(editingId.value, payload)
-        ElMessage.success('更新成功')
+        ElMessage.success(t('common.feedback.updateSuccess'))
       } else {
         if (!form.api_key) {
-          ElMessage.warning('请输入 API Key')
+          ElMessage.warning(t('system.ai.providers.apiKeyRequired'))
           saving.value = false
           return
         }
@@ -302,7 +305,7 @@ async function handleSave() {
           sort: form.sort,
           remark: form.remark || null,
         })
-        ElMessage.success('创建成功')
+        ElMessage.success(t('common.feedback.createSuccess'))
       }
       dialogVisible.value = false
       fetchData()
@@ -313,9 +316,9 @@ async function handleSave() {
 }
 
 async function handleDelete(row: ProviderRow) {
-  await ElMessageBox.confirm(`确定删除模型密钥「${row.name}」吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('system.ai.providers.confirmDelete', { name: row.name }), t('common.feedback.tip'), { type: 'warning' })
   await deleteProvider(row.id)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('common.feedback.deleteSuccess'))
   fetchData()
 }
 
@@ -327,7 +330,7 @@ async function handleTest(row: ProviderRow) {
     const data: any = await testProvider(row.id)
     testResult.value = data
   } catch (err: any) {
-    testResult.value = { ok: false, error: err.message || '请求失败' }
+    testResult.value = { ok: false, error: err.message || t('common.feedback.requestFailed') }
   } finally {
     testLoading.value = false
   }

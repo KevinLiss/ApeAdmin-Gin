@@ -83,17 +83,17 @@ func (h *McpHandler) ToolCall(c *gin.Context) {
 		Arguments map[string]interface{} `json:"arguments"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	manager := core.GetMCPManager()
 	if manager == nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "MCP 管理器未初始化"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "mcp.not_initialized", nil))
 		return
 	}
 	tool, ok := manager.GetTool(req.Name)
 	if !ok {
-		c.JSON(http.StatusNotFound, response.Error(404, "工具不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "mcp.tool_not_found", nil))
 		return
 	}
 	userID := c.GetUint("user_id")
@@ -110,7 +110,7 @@ func (h *McpHandler) ToolCall(c *gin.Context) {
 	resultJSON, _ := json.Marshal(result)
 	manager.WriteAuditLog(userID, username, "tool", req.Name, string(argsJSON), string(resultJSON), status, duration)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "调用失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "mcp.call_fail", map[string]string{"error": err.Error()}))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(map[string]interface{}{"result": result}))
@@ -140,12 +140,12 @@ func (h *McpHandler) Resources(c *gin.Context) {
 func (h *McpHandler) ResourceRead(c *gin.Context) {
 	uri := c.Query("uri")
 	if uri == "" {
-		c.JSON(http.StatusBadRequest, response.Error(400, "uri 参数必填"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "mcp.uri_required", nil))
 		return
 	}
 	manager := core.GetMCPManager()
 	if manager == nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "MCP 管理器未初始化"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "mcp.not_initialized", nil))
 		return
 	}
 	userID := c.GetUint("user_id")
@@ -159,7 +159,7 @@ func (h *McpHandler) ResourceRead(c *gin.Context) {
 	}
 	manager.WriteAuditLog(userID, username, "resource", uri, "", content, status, duration)
 	if !ok {
-		c.JSON(http.StatusNotFound, response.Error(404, "资源不存在或读取失败"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "mcp.resource_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(map[string]interface{}{"uri": uri, "content": content}))
@@ -191,12 +191,12 @@ func (h *McpHandler) PromptRender(c *gin.Context) {
 		Arguments map[string]string `json:"arguments"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	manager := core.GetMCPManager()
 	if manager == nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "MCP 管理器未初始化"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "mcp.not_initialized", nil))
 		return
 	}
 	userID := c.GetUint("user_id")
@@ -211,7 +211,7 @@ func (h *McpHandler) PromptRender(c *gin.Context) {
 	}
 	manager.WriteAuditLog(userID, username, "prompt", req.Name, string(argsJSON), rendered, status, duration)
 	if !ok {
-		c.JSON(http.StatusNotFound, response.Error(404, "提示词不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "mcp.prompt_not_found", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(map[string]interface{}{"rendered": rendered}))

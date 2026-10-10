@@ -1,44 +1,44 @@
 <template>
   <div class="dev-example-page">
     <div class="page-header">
-      <h2>备忘录管理</h2>
-      <p class="text-muted">插件开发示例——完整的 CRUD + 权限控制演示</p>
+      <h2>{{ t('system.notes.title') }}</h2>
+      <p class="text-muted">{{ t('system.notes.subtitle') }}</p>
     </div>
 
     <!-- 操作栏 -->
     <div class="toolbar">
       <el-button type="primary" @click="openCreate" v-permission="'dev_example:notes:create'">
-        <el-icon><Plus /></el-icon> 新增备忘录
+        <el-icon><Plus /></el-icon> {{ t('system.notes.add') }}
       </el-button>
       <el-button @click="fetchList" :loading="loading">
-        <el-icon><Refresh /></el-icon> 刷新
+        <el-icon><Refresh /></el-icon> {{ t('common.actions.refresh') }}
       </el-button>
     </div>
 
     <!-- 列表 -->
     <el-table :data="tableData" v-loading="loading" stripe style="width: 100%; margin-top: 16px">
       <el-table-column prop="id" label="ID" width="60" />
-      <el-table-column prop="title" label="标题" min-width="160" />
-      <el-table-column prop="content" label="内容" min-width="200" show-overflow-tooltip />
-      <el-table-column label="优先级" width="100">
+      <el-table-column prop="title" :label="t('system.notes.titleCol')" min-width="160" />
+      <el-table-column prop="content" :label="t('system.notes.content')" min-width="200" show-overflow-tooltip />
+      <el-table-column :label="t('system.notes.priority')" width="100">
         <template #default="{ row }">
           <el-tag :type="priorityType(row.priority)" size="small">
             {{ priorityText(row.priority) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="80">
+      <el-table-column :label="t('system.notes.status')" width="80">
         <template #default="{ row }">
           <el-tag :type="row.completed ? 'success' : 'info'" size="small">
-            {{ row.completed ? '已完成' : '待办' }}
+            {{ row.completed ? t('system.notes.completed') : t('system.notes.pending') }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="created_at" label="创建时间" width="170" />
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column prop="created_at" :label="t('system.notes.createTime')" width="170" />
+      <el-table-column :label="t('system.notes.actions')" width="160" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openEdit(row)" v-permission="'dev_example:notes:edit'">编辑</el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(row)" v-permission="'dev_example:notes:delete'">删除</el-button>
+          <el-button link type="primary" size="small" @click="openEdit(row)" v-permission="'dev_example:notes:edit'">{{ t('common.actions.edit') }}</el-button>
+          <el-button link type="danger" size="small" @click="handleDelete(row)" v-permission="'dev_example:notes:delete'">{{ t('common.actions.delete') }}</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -57,28 +57,28 @@
     </div>
 
     <!-- 新增/编辑弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑备忘录' : '新增备忘录'" width="500px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? t('system.notes.edit') : t('system.notes.add')" width="500px">
       <el-form :model="form" label-width="70px">
-        <el-form-item label="标题" required>
-          <el-input v-model="form.title" placeholder="请输入标题" maxlength="200" />
+        <el-form-item :label="t('system.notes.titleCol')" required>
+          <el-input v-model="form.title" :placeholder="t('system.notes.titlePlaceholder')" maxlength="200" />
         </el-form-item>
-        <el-form-item label="内容">
-          <el-input v-model="form.content" type="textarea" :rows="4" placeholder="请输入内容" maxlength="5000" />
+        <el-form-item :label="t('system.notes.content')">
+          <el-input v-model="form.content" type="textarea" :rows="4" :placeholder="t('system.notes.contentPlaceholder')" maxlength="5000" />
         </el-form-item>
-        <el-form-item label="优先级">
+        <el-form-item :label="t('system.notes.priority')">
           <el-select v-model="form.priority" style="width: 100%">
-            <el-option label="普通" :value="0" />
-            <el-option label="重要" :value="1" />
-            <el-option label="紧急" :value="2" />
+            <el-option :label="t('system.notes.priorityNormal')" :value="0" />
+            <el-option :label="t('system.notes.priorityImportant')" :value="1" />
+            <el-option :label="t('system.notes.priorityUrgent')" :value="2" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="editingId" label="状态">
-          <el-switch v-model="form.completed" active-text="已完成" inactive-text="待办" />
+        <el-form-item v-if="editingId" :label="t('system.notes.status')">
+          <el-switch v-model="form.completed" :active-text="t('system.notes.completed')" :inactive-text="t('system.notes.pending')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
+        <el-button @click="dialogVisible = false">{{ t('common.actions.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="handleSave">{{ t('common.actions.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -87,8 +87,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import request from '@/api/request'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -111,7 +114,7 @@ function priorityType(p: number) {
 }
 
 function priorityText(p: number) {
-  return p === 2 ? '紧急' : p === 1 ? '重要' : '普通'
+  return p === 2 ? t('system.notes.priorityUrgent') : p === 1 ? t('system.notes.priorityImportant') : t('system.notes.priorityNormal')
 }
 
 async function fetchList() {
@@ -149,7 +152,7 @@ function openEdit(row: any) {
 
 async function handleSave() {
   if (!form.title.trim()) {
-    ElMessage.warning('请输入标题')
+    ElMessage.warning(t('system.notes.titleRequired'))
     return
   }
   saving.value = true
@@ -161,14 +164,14 @@ async function handleSave() {
         priority: form.priority,
         completed: form.completed,
       })
-      ElMessage.success('更新成功')
+      ElMessage.success(t('system.notes.updateSuccess'))
     } else {
       await request.post('/dev-example/notes', {
         title: form.title,
         content: form.content,
         priority: form.priority,
       })
-      ElMessage.success('创建成功')
+      ElMessage.success(t('system.notes.createSuccess'))
     }
     dialogVisible.value = false
     await fetchList()
@@ -180,9 +183,9 @@ async function handleSave() {
 }
 
 async function handleDelete(row: any) {
-  await ElMessageBox.confirm(`确定删除「${row.title}」吗？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('system.notes.confirmDelete', { title: row.title }), t('common.feedback.tip'), { type: 'warning' })
   await request.delete(`/dev-example/notes/${row.id}`)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('system.notes.deleteSuccess'))
   await fetchList()
 }
 

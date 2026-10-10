@@ -2,13 +2,16 @@
   <div class="error-page">
     <div class="error-content">
       <h1>404</h1>
-      <p>页面不存在或无权限访问</p>
-      <el-button type="primary" @click="$router.push('/dashboard')">返回首页</el-button>
+      <p>{{ t('common.error.notFoundTitle') }}</p>
+      <el-button type="primary" @click="$router.push('/dashboard')">{{ t('common.error.backHome') }}</el-button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 </script>
 
 <style scoped>

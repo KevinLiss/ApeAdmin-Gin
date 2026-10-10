@@ -106,6 +106,7 @@ func buildMenuTree(menus []model.SysMenu, parentID uint) []schema.MenuNode {
 			node := schema.MenuNode{
 				ID:         m.ID,
 				Name:       m.Name,
+				I18nKey:    m.I18nKey,
 				ParentID:   m.ParentID,
 				Type:       m.Type,
 				Path:       m.Path,

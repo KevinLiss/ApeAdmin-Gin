@@ -54,7 +54,7 @@ func LoginGuard() gin.HandlerFunc {
 		entry, exists := lgRecords[key]
 		if exists && time.Now().Before(entry.lockedUntil) {
 			lgMu.Unlock()
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, response.Error(429, "登录失败次数过多，请稍后再试"))
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, response.ErrorCtx(c, 429, "auth.login_too_many", nil))
 			return
 		}
 		lgMu.Unlock()

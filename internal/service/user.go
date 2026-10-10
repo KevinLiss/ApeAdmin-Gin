@@ -11,20 +11,29 @@ import (
 	"gorm.io/gorm"
 )
 
+// LoginError 业务错误（携带 i18n key，handler 层按请求语言翻译）
+type LoginError struct {
+	Key string
+}
+
+func (e *LoginError) Error() string {
+	return core.T(core.DefaultLocale(), e.Key, nil)
+}
+
 // Login 用户登录
 func Login(username, password, ip string) (*schema.LoginResponse, error) {
 	user, err := dal.GetUserByUsername(username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("用户名或密码错误")
+			return nil, &LoginError{Key: "auth.wrong_credentials"}
 		}
 		return nil, err
 	}
 	if user.Status != 1 {
-		return nil, errors.New("用户已禁用")
+		return nil, &LoginError{Key: "auth.account_disabled"}
 	}
 	if !utils.CheckPassword(password, user.Password) {
-		return nil, errors.New("用户名或密码错误")
+		return nil, &LoginError{Key: "auth.wrong_credentials"}
 	}
 
 	// 更新最后登录信息
@@ -70,7 +79,7 @@ func ChangePassword(userID uint, oldPassword, newPassword string) error {
 		return err
 	}
 	if !utils.CheckPassword(oldPassword, user.Password) {
-		return errors.New("原密码错误")
+		return &LoginError{Key: "auth.old_pwd_error"}
 	}
 	hash, err := utils.HashPassword(newPassword)
 	if err != nil {
@@ -108,7 +117,7 @@ func UpdateProfile(userID uint, req schema.UpdateProfileRequest) error {
 func RefreshToken(refreshTokenStr string) (*schema.LoginResponse, error) {
 	claims, err := core.ParseToken(refreshTokenStr)
 	if err != nil || claims.Type != "refresh" {
-		return nil, errors.New("refresh token 无效")
+		return nil, &LoginError{Key: "auth.refresh_invalid"}
 	}
 	userID, err := core.GetUserIDFromClaims(claims)
 	if err != nil {
@@ -116,7 +125,7 @@ func RefreshToken(refreshTokenStr string) (*schema.LoginResponse, error) {
 	}
 	user, err := dal.GetUserByID(userID)
 	if err != nil || user.Status != 1 {
-		return nil, errors.New("用户不存在或已禁用")
+		return nil, &LoginError{Key: "auth.user_disabled"}
 	}
 	accessToken, err := core.GenerateAccessToken(user)
 	if err != nil {

@@ -1,7 +1,9 @@
 package api
 
 import (
+	"errors"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +13,20 @@ import (
 	"apeadmin-gin/internal/service"
 )
 
+// translateServiceErr 将 service 层返回的 key 化错误按请求语言翻译；非 key 化错误原样返回
+func translateServiceErr(c *gin.Context, err error) string {
+	var le *service.LoginError
+	if ok := errors.As(err, &le); ok {
+		return response.ErrorCtx(c, 0, le.Key, nil).Msg
+	}
+	return err.Error()
+}
+
+// T api 包内便捷翻译（handler 内拼 params 用）
+func T(c *gin.Context, key string) string {
+	return response.ErrorCtx(c, 0, key, nil).Msg
+}
+
 // AuthHandler 认证相关 Handler
 type AuthHandler struct{}
 
@@ -18,12 +34,12 @@ type AuthHandler struct{}
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req schema.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	result, err := service.Login(req.Username, req.Password, c.ClientIP())
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, response.Error(401, err.Error()))
+		c.JSON(http.StatusUnauthorized, response.Body{Code: 401, Msg: translateServiceErr(c, err)})
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(result))
@@ -34,7 +50,7 @@ func (h *AuthHandler) GetUserInfo(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	info, err := service.GetUserInfo(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "获取用户信息失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "auth.get_userinfo_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(info))
@@ -45,7 +61,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	user, err := dal.GetUserWithRoles(userID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "用户不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "common.not_found", map[string]string{"name": T(c, "user.label")}))
 		return
 	}
 	roles := make([]map[string]interface{}, 0, len(user.Roles))
@@ -82,17 +98,17 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	var req schema.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	if err := service.UpdateProfile(userID, req); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "更新失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.update_fail", nil))
 		return
 	}
 	// 返回更新后的用户信息，前端需用返回值同步 profile 和 Pinia store
 	user, err := dal.GetUserWithRoles(userID)
 	if err != nil {
-		c.JSON(http.StatusOK, response.SuccessMsg("更新成功"))
+		c.JSON(http.StatusOK, response.SuccessCtx(c, "common.update_ok", nil))
 		return
 	}
 	roles := make([]map[string]interface{}, 0, len(user.Roles))
@@ -133,14 +149,14 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	var req schema.ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	if err := service.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, err.Error()))
+		c.JSON(http.StatusBadRequest, response.Body{Code: 400, Msg: translateServiceErr(c, err)})
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("密码修改成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "auth.pwd_change_ok", nil))
 }
 
 // Logout 登出
@@ -151,10 +167,10 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		jtiStr = v
 	}
 	if err := service.Logout(jtiStr); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "登出失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "auth.logout_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("登出成功"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "auth.logout_ok", nil))
 }
 
 // RefreshToken 刷新 token
@@ -163,22 +179,24 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		RefreshToken string `json:"refresh_token" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	result, err := service.RefreshToken(req.RefreshToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, response.Error(401, err.Error()))
+		c.JSON(http.StatusUnauthorized, response.Body{Code: 401, Msg: translateServiceErr(c, err)})
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(result))
 }
 
 // HealthCheck 健康检查
+// pid 用于前端「重启后端」后轮询比对新旧进程，判断服务是否已恢复
 func HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success(gin.H{
 		"status": "ok",
 		"time":   time.Now().Format(time.RFC3339),
+		"pid":    os.Getpid(),
 	}))
 }
 
@@ -186,7 +204,7 @@ func HealthCheck(c *gin.Context) {
 func GetPublicSettings(c *gin.Context) {
 	settings, err := dal.ListPublicSettings()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "获取设置失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "setting.get_fail", nil))
 		return
 	}
 	result := make(map[string]string)

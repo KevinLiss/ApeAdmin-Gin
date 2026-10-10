@@ -10,11 +10,11 @@
       <div class="left-header">
         <!-- Desktop: inline search -->
         <div v-if="!isMobile" class="search-box">
-          <input class="search-input" type="text" placeholder="搜索页面，如：用户、角色、菜单..." v-model="keyword" @input="onSearchInput" @keyup.enter="onSearch" @focus="onSearchInput" @keydown.down.prevent="moveHighlight(1)" @keydown.up.prevent="moveHighlight(-1)" />
+          <input class="search-input" type="text" :placeholder="t('common.app.searchPlaceholder')" v-model="keyword" @input="onSearchInput" @keyup.enter="onSearch" @focus="onSearchInput" @keydown.down.prevent="moveHighlight(1)" @keydown.up.prevent="moveHighlight(-1)" />
           <span class="search-icon" @click="onSearch"><el-icon :size="16"><Search /></el-icon></span>
           <!-- 搜索结果下拉面板 -->
           <div v-if="keyword.trim() && searchResults.length" class="search-dropdown">
-            <div class="search-dropdown-head">搜索结果（{{ searchResults.length }}）</div>
+            <div class="search-dropdown-head">{{ t('common.app.searchResult') }}（{{ searchResults.length }}）</div>
             <ul class="search-dropdown-list">
               <li v-for="(item, i) in searchResults" :key="item.path" :class="{ active: i === highlightIndex }" @click="goToPage(item)" @mouseenter="highlightIndex = i">
                 <el-icon class="search-item-icon" :size="16"><component :is="item.icon || 'Document'" /></el-icon>
@@ -28,7 +28,7 @@
         <div v-else class="mobile-search" @click="mobileSearchOpen = !mobileSearchOpen">
           <el-icon :size="20"><Search /></el-icon>
           <Transition name="search-slide">
-            <input v-if="mobileSearchOpen" class="mobile-search-input" type="text" placeholder="搜索..." v-model="keyword" @input="onSearchInput" @keyup.enter="onSearch" ref="mobileSearchRef" />
+            <input v-if="mobileSearchOpen" class="mobile-search-input" type="text" :placeholder="t('common.actions.search') + '...'" v-model="keyword" @input="onSearchInput" @keyup.enter="onSearch" ref="mobileSearchRef" />
           </Transition>
           <!-- 移动端搜索结果 -->
           <div v-if="keyword.trim() && searchResults.length" class="search-dropdown mobile-search-dropdown">
@@ -42,9 +42,24 @@
         </div>
       </div>
 
-      <!-- Right icons -->
+        <!-- Right icons -->
       <div class="nav-right">
         <ul class="nav-menus">
+          <!-- Language switcher -->
+          <li class="icon-item lang-item" @click="langVisible = !langVisible">
+            <span class="flag-icon" :class="currentLocaleFlag"></span>
+            <span class="lang-txt">{{ currentLocaleLabel }}</span>
+            <el-icon :size="12"><ArrowDown /></el-icon>
+            <ul v-if="langVisible" class="profile-dropdown lang-dropdown">
+              <li v-for="l in localeOptions" :key="l.code">
+                <a :class="{ active: l.code === currentLocale }" @click="switchLanguage(l.code)">
+                  <span class="flag-icon" :class="l.flag"></span>
+                  <span>{{ l.label }}</span>
+                </a>
+              </li>
+            </ul>
+          </li>
+
           <!-- Theme toggle -->
           <li class="icon-item" @click="$emit('toggle-theme')">
             <el-icon :size="18"><Moon v-if="!isDark" /><Sunny v-else /></el-icon>
@@ -60,13 +75,13 @@
             <el-icon :size="18"><Bell /></el-icon>
             <span class="badge-num">{{ notifications.length }}</span>
             <div v-if="notifVisible" class="dropdown-panel notif-panel">
-              <div class="dropdown-head"><el-icon :size="16"><Bell /></el-icon><h3>通知</h3></div>
+              <div class="dropdown-head"><el-icon :size="16"><Bell /></el-icon><h3>{{ t('common.app.notification') }}</h3></div>
               <ul>
                 <li v-for="(n, i) in notifications" :key="i">
                   <p><span class="dot" :style="{ background: n.color }"></span>{{ n.text }}<em>{{ n.time }}</em></p>
                 </li>
               </ul>
-              <a class="check-all" @click="viewAllNotifications">查看全部通知</a>
+              <a class="check-all" @click="viewAllNotifications">{{ t('common.app.notification') }}</a>
             </div>
           </li>
 
@@ -90,9 +105,9 @@
               </div>
             </div>
             <ul v-if="profileVisible" class="profile-dropdown">
-              <li><a @click="$emit('profile')"><el-icon :size="16"><User /></el-icon><span>个人中心</span></a></li>
-              <li><a @click="$emit('settings')"><el-icon :size="16"><Setting /></el-icon><span>系统设置</span></a></li>
-              <li><a @click="handleLogout"><el-icon :size="16"><SwitchButton /></el-icon><span>退出登录</span></a></li>
+              <li><a @click="$emit('profile')"><el-icon :size="16"><User /></el-icon><span>{{ t('common.app.profile') }}</span></a></li>
+              <li><a @click="$emit('settings')"><el-icon :size="16"><Setting /></el-icon><span>{{ t('common.app.settings') }}</span></a></li>
+              <li><a @click="handleLogout"><el-icon :size="16"><SwitchButton /></el-icon><span>{{ t('common.app.logout') }}</span></a></li>
             </ul>
           </li>
         </ul>
@@ -108,7 +123,10 @@
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
+import { SUPPORTED_LOCALES, getLocale, setLocale } from '@/locales'
+import { loadI18nFromServer } from '@/utils/i18nRemote'
 import VersionUpdateDialog from './VersionUpdateDialog.vue'
 
 const props = defineProps<{
@@ -126,12 +144,14 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const userStore = useUserStore()
+const { t, locale } = useI18n()
 
 const keyword = ref('')
 const versionUpdateVisible = ref(false)
 const notifVisible = ref(false)
 const msgVisible = ref(false)
 const profileVisible = ref(false)
+const langVisible = ref(false)
 const mobileSearchOpen = ref(false)
 const mobileSearchRef = ref<HTMLInputElement>()
 const windowWidth = ref(window.innerWidth)
@@ -150,6 +170,7 @@ function handleClickOutside(e: MouseEvent) {
   const target = e.target as HTMLElement
   if (!target.closest('.has-badge')) notifVisible.value = false
   if (!target.closest('.profile-nav')) profileVisible.value = false
+  if (!target.closest('.lang-item')) langVisible.value = false
 }
 
 onMounted(() => {
@@ -160,21 +181,40 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 
-const notifications = [
-  { text: '系统健康检查完成', time: '10 分钟', color: '#5A67F5' },
-  { text: 'MCP 插件加载成功', time: '1 小时', color: '#67C23A' },
-  { text: '新用户注册', time: '3 小时', color: '#E6A23C' },
-  { text: '数据库备份完成', time: '6 小时', color: '#F56C6C' },
-]
+// ===== 语言切换 =====
+const localeOptions = computed(() =>
+  SUPPORTED_LOCALES.map((l) => ({ code: l.code, label: l.label, flag: l.code === 'zh-CN' ? 'flag-cn' : 'flag-us' }))
+)
+const currentLocale = computed(() => locale.value)
+const currentLocaleLabel = computed(
+  () => localeOptions.value.find((l) => l.code === currentLocale.value)?.label || '简体中文'
+)
+const currentLocaleFlag = computed(() => (currentLocale.value === 'zh-CN' ? 'flag-cn' : 'flag-us'))
+
+async function switchLanguage(code: string) {
+  if (code === currentLocale.value) {
+    langVisible.value = false
+    return
+  }
+  setLocale(code)
+  langVisible.value = false
+  // Pull DB overrides for the new locale, then reload so Element Plus locale + all pages re-render
+  await loadI18nFromServer(code)
+  window.location.reload()
+}
+
+const notifications = computed(() => [
+  { text: t('dashboard.welcome.subtitle'), time: '10 min', color: '#5A67F5' },
+])
 
 function viewAllNotifications() {
   notifVisible.value = false
-  ElMessage.info('通知中心开发中，敬请期待')
+  ElMessage.info(t('common.app.notificationCenter'))
 }
 
 const avatarText = computed(() => (userStore.nickname || userStore.username || 'A').charAt(0).toUpperCase())
 const profileText = computed(() => userStore.roles?.[0] || 'Admin')
-const roleText = computed(() => (profileText.value === 'admin' ? '超级管理员' : profileText.value))
+const roleText = computed(() => (profileText.value === 'admin' ? t('common.app.superAdmin') : profileText.value))
 
 function onSearch() {
   if (keyword.value.trim() && searchResults.value.length) {
@@ -248,7 +288,7 @@ function toggleFullscreen() {
 
 async function handleLogout() {
   await userStore.logout()
-  ElMessage.success('已退出登录')
+  ElMessage.success(t('common.feedback.logoutSuccess'))
   emit('logout')
   router.push('/login')
 }
@@ -418,12 +458,29 @@ async function handleLogout() {
   gap: 6px;
   border-radius: 8px;
 }
+.icon-item.lang-item .el-icon {
+  color: #909399;
+}
+.lang-dropdown {
+  min-width: 150px;
+}
+.lang-dropdown a.active {
+  color: var(--theme-default, #5A67F5);
+  font-weight: 600;
+}
 .flag-icon {
   width: 18px;
   height: 13px;
   border-radius: 2px;
-  background: linear-gradient(135deg, #de2910 33%, #ffde00 33%, #ffde00 66%, #de2910 66%);
   display: inline-block;
+  background: linear-gradient(135deg, #de2910 33%, #ffde00 33%, #ffde00 66%, #de2910 66%);
+}
+.flag-icon.flag-cn {
+  background: linear-gradient(135deg, #de2910 33%, #ffde00 33%, #ffde00 66%, #de2910 66%);
+}
+.flag-icon.flag-us {
+  background: linear-gradient(135deg, #3c3b6e 40%, #b22234 40%, #b22234 60%, #ffffff 60%);
+  border: 1px solid #e0e0e0;
 }
 .lang-txt {
   font-size: 13px;

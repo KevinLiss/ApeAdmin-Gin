@@ -26,7 +26,7 @@ func (h *PluginHandler) List(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "12"))
 	plugins, total, err := dal.ListPlugins(page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "查询失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.query_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.SuccessPage(plugins, total, page, pageSize))
@@ -39,17 +39,17 @@ func (h *PluginHandler) Toggle(c *gin.Context) {
 		Enabled bool `json:"enabled"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	plugin, err := dal.GetPluginByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "插件不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "plugin.not_found", nil))
 		return
 	}
 	plugin.Enabled = req.Enabled
 	if err := dal.UpdatePlugin(plugin); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "操作失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.operation_fail", nil))
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(gin.H{"refresh": true}))
@@ -60,7 +60,7 @@ func (h *PluginHandler) GetConfig(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	plugin, err := dal.GetPluginByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "插件不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "plugin.not_found", nil))
 		return
 	}
 	config := "{}"
@@ -77,54 +77,54 @@ func (h *PluginHandler) UpdateConfig(c *gin.Context) {
 		Config string `json:"config"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "参数错误"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
 	plugin, err := dal.GetPluginByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "插件不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "plugin.not_found", nil))
 		return
 	}
 	cfg := req.Config
 	plugin.Config = &cfg
 	if err := dal.UpdatePlugin(plugin); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "更新失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.update_fail", nil))
 		return
 	}
-	c.JSON(http.StatusOK, response.SuccessMsg("配置已保存"))
+	c.JSON(http.StatusOK, response.SuccessCtx(c, "setting.save_ok", nil))
 }
 
 // Upload 上传 ZIP 插件包（L2 声明式清单插件）
 func (h *PluginHandler) Upload(c *gin.Context) {
 	cfg := core.GetConfig()
 	if cfg == nil || !cfg.Plugin.Enabled {
-		c.JSON(http.StatusBadRequest, response.Error(400, "插件功能未启用"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "plugin.not_enabled", nil))
 		return
 	}
 
 	// 1. 接收 multipart 文件
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(400, "缺少文件字段 file"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.file_missing", nil))
 		return
 	}
 
 	// 2. 扩展名校验
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	if ext != ".zip" {
-		c.JSON(http.StatusBadRequest, response.Error(400, "仅支持 .zip 格式插件包"))
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "plugin.zip_only", nil))
 		return
 	}
 
 	// 3. 保存到临时目录
 	tmpDir := filepath.Join(cfg.Plugin.UploadDir, "_tmp")
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "创建临时目录失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "file.tmpdir_fail", nil))
 		return
 	}
 	tmpPath := filepath.Join(tmpDir, fmt.Sprintf("%d-%s", time.Now().UnixNano(), file.Filename))
 	if err := c.SaveUploadedFile(file, tmpPath); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "保存上传文件失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "file.save_fail", nil))
 		return
 	}
 	defer os.Remove(tmpPath) // 无论成功失败都清理临时文件
@@ -151,7 +151,7 @@ func (h *PluginHandler) Upload(c *gin.Context) {
 func (h *PluginHandler) Restart(c *gin.Context) {
 	core.RequestShutdown()
 	c.JSON(http.StatusOK, response.Success(gin.H{
-		"message": "服务正在重启...",
+		"message": response.SuccessCtx(c, "plugin.restarting", nil).Msg,
 	}))
 }
 
@@ -160,14 +160,14 @@ func (h *PluginHandler) Delete(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	pluginRec, err := dal.GetPluginByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, response.Error(404, "插件不存在"))
+		c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "plugin.not_found", nil))
 		return
 	}
 
 	// 记录文件路径后先删 DB 记录，再清理文件（文件清理失败仅记日志，不影响 DB）
 	modulePath := pluginRec.ModulePath
 	if err := dal.DeletePlugin(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, response.Error(500, "删除失败"))
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.delete_fail", nil))
 		return
 	}
 

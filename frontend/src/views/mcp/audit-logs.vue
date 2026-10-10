@@ -1,54 +1,54 @@
 <template>
   <el-card shadow="never" class="page-card">
     <div class="toolbar">
-      <el-select v-model="filterType" placeholder="全部类型" clearable style="width: 140px" @change="fetchData">
-        <el-option label="工具调用" value="tool" />
-        <el-option label="资源读取" value="resource" />
-        <el-option label="提示词渲染" value="prompt" />
+      <el-select v-model="filterType" :placeholder="t('system.mcp.auditLogs.allTypes')" clearable style="width: 140px" @change="fetchData">
+        <el-option :label="t('system.mcp.auditLogs.toolCall')" value="tool" />
+        <el-option :label="t('system.mcp.auditLogs.resourceRead')" value="resource" />
+        <el-option :label="t('system.mcp.auditLogs.promptRender')" value="prompt" />
       </el-select>
       <el-input
         v-model="keyword"
-        placeholder="搜索工具名/用户名"
+        :placeholder="t('system.mcp.auditLogs.searchPlaceholder')"
         clearable
         style="width: 220px"
         @keyup.enter="fetchData"
         @clear="fetchData"
       />
       <el-button type="primary" @click="fetchData">
-        <el-icon><Search /></el-icon>查询
+        <el-icon><Search /></el-icon>{{ t('common.actions.query') }}
       </el-button>
       <el-button @click="resetQuery">
-        <el-icon><Refresh /></el-icon>重置
+        <el-icon><Refresh /></el-icon>{{ t('common.actions.reset') }}
       </el-button>
     </div>
 
     <el-table :data="logs" v-loading="loading" stripe>
       <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column label="类型" width="120">
+      <el-table-column :label="t('system.mcp.auditLogs.type')" width="120">
         <template #default="{ row }">
           <el-tag :type="typeTag(row.action_type)" size="small">{{ typeLabel(row.action_type) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="target_name" label="目标" min-width="180">
+      <el-table-column prop="target_name" :label="t('system.mcp.auditLogs.target')" min-width="180">
         <template #default="{ row }">
           <code class="target-code">{{ row.target_name }}</code>
         </template>
       </el-table-column>
-      <el-table-column label="参数" min-width="200" show-overflow-tooltip>
+      <el-table-column :label="t('system.mcp.auditLogs.arguments')" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">
           <span class="muted">{{ row.arguments || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="username" label="操作用户" width="120" />
-      <el-table-column label="状态" width="90">
+      <el-table-column prop="username" :label="t('system.mcp.auditLogs.operator')" width="120" />
+      <el-table-column :label="t('system.mcp.auditLogs.status')" width="90">
         <template #default="{ row }">
           <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">
-            {{ row.status === 'success' ? '成功' : '失败' }}
+            {{ row.status === 'success' ? t('common.status.success') : t('common.status.failed') }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="created_at" label="时间" width="170" />
-      <el-table-column label="结果预览" min-width="200">
+      <el-table-column prop="created_at" :label="t('system.mcp.auditLogs.time')" width="170" />
+      <el-table-column :label="t('system.mcp.auditLogs.resultPreview')" min-width="200">
         <template #default="{ row }">
           <span class="muted">{{ (row.result_preview || '').slice(0, 80) }}</span>
         </template>
@@ -71,7 +71,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { getMcpAuditLogs } from '@/api'
+
+const { t } = useI18n()
 
 const logs = ref<any[]>([])
 const loading = ref(false)
@@ -81,12 +84,16 @@ const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 
-function typeLabel(t: string) {
-  return { tool: '工具调用', resource: '资源读取', prompt: '提示词渲染' }[t] || t
+function typeLabel(type: string) {
+  return {
+    tool: t('system.mcp.auditLogs.toolCall'),
+    resource: t('system.mcp.auditLogs.resourceRead'),
+    prompt: t('system.mcp.auditLogs.promptRender'),
+  }[type] || type
 }
 
-function typeTag(t: string) {
-  return { tool: 'primary', resource: 'success', prompt: 'warning' }[t] || 'info'
+function typeTag(type: string) {
+  return { tool: 'primary', resource: 'success', prompt: 'warning' }[type] || 'info'
 }
 
 async function fetchData() {

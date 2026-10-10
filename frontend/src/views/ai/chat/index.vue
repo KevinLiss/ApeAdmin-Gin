@@ -4,8 +4,8 @@
     <transition name="session-slide">
       <div v-show="!isMobile || sessionDrawerOpen" class="session-panel">
         <div class="session-panel-header">
-          <span class="session-panel-title">会话</span>
-          <el-tooltip content="新建会话" placement="bottom">
+          <span class="session-panel-title">{{ t('system.ai.chat.sessions') }}</span>
+          <el-tooltip :content="t('system.ai.chat.newSession')" placement="bottom">
             <button class="icon-btn" @click="newSession">
               <el-icon :size="16"><Plus /></el-icon>
             </button>
@@ -27,7 +27,7 @@
               @click.stop="confirmDeleteSession(s)"
             ><Delete /></el-icon>
           </div>
-          <div v-if="sessions.length === 0" class="session-empty">暂无历史会话</div>
+          <div v-if="sessions.length === 0" class="session-empty">{{ t('system.ai.chat.noSessions') }}</div>
         </div>
       </div>
     </transition>
@@ -46,13 +46,13 @@
           <button v-if="isMobile" class="icon-btn" @click="sessionDrawerOpen = true">
             <el-icon :size="18"><Menu /></el-icon>
           </button>
-          <span class="chat-title">AI 全能助手</span>
+          <span class="chat-title">{{ t('system.ai.chat.title') }}</span>
         </div>
         <div class="chat-header-right">
           <!-- 供应商 + 模型 二级选择（替代原双标签 bug） -->
           <el-select
             v-model="selectedProviderId"
-            placeholder="供应商"
+            :placeholder="t('system.ai.chat.provider')"
             class="provider-select"
             size="default"
             @change="onProviderChange"
@@ -66,7 +66,7 @@
           </el-select>
           <el-select
             v-model="selectedModel"
-            placeholder="模型"
+            :placeholder="t('system.ai.chat.model')"
             class="model-select"
             size="default"
             :disabled="modelOptions.length === 0"
@@ -74,7 +74,7 @@
           >
             <el-option v-for="m in modelOptions" :key="m" :label="m" :value="m" />
           </el-select>
-          <el-tooltip content="清空当前对话" placement="bottom">
+          <el-tooltip :content="t('system.ai.chat.clearChat')" placement="bottom">
             <button class="icon-btn" @click="clearChat">
               <el-icon :size="16"><Delete /></el-icon>
             </button>
@@ -89,7 +89,7 @@
           <div class="welcome-logo">
             <el-icon :size="30" color="#fff"><ChatDotRound /></el-icon>
           </div>
-          <h3>有什么可以帮您？</h3>
+          <h3>{{ t('system.ai.chat.welcome') }}</h3>
           <div class="welcome-suggestions">
             <div
               v-for="s in suggestions"
@@ -119,7 +119,7 @@
           </div>
           <div class="message-body">
             <div class="message-meta">
-              <span class="message-role">{{ msg.role === 'user' ? '我' : 'AI 助手' }}</span>
+              <span class="message-role">{{ msg.role === 'user' ? t('system.ai.chat.roleUser') : t('system.ai.chat.roleAssistant') }}</span>
             </div>
             <!-- 工具调用状态 -->
             <div v-if="msg.toolEvents && msg.toolEvents.length" class="tool-events">
@@ -149,7 +149,7 @@
             </div>
             <!-- 消息操作（复制） -->
             <div v-if="msg.content && !msg.streaming" class="message-actions" :class="{ user: msg.role === 'user' }">
-              <el-tooltip content="复制" placement="top">
+              <el-tooltip :content="t('system.ai.chat.copy')" placement="top">
                 <button class="msg-action-btn" @click="copyMessage(msg)">
                   <el-icon :size="13"><CopyDocument /></el-icon>
                 </button>
@@ -167,16 +167,16 @@
             type="textarea"
             :rows="2"
             :autosize="{ minRows: 2, maxRows: 6 }"
-            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+            :placeholder="t('system.ai.chat.inputPlaceholder')"
             resize="none"
             @keydown.enter.exact.prevent="sendMessage"
           />
           <div class="input-actions">
             <div class="input-actions-left">
-              <el-tooltip content="启用工具调用（允许 AI 查询/操作系统数据）" placement="top">
+              <el-tooltip :content="t('system.ai.chat.toolsTip')" placement="top">
                 <div class="tools-toggle">
                   <el-icon :size="14"><SetUp /></el-icon>
-                  <span>工具</span>
+                  <span>{{ t('system.ai.chat.tools') }}</span>
                   <el-switch v-model="enableTools" size="small" />
                 </div>
               </el-tooltip>
@@ -189,10 +189,10 @@
                 :disabled="!inputText.trim()"
                 @click="sendMessage"
               >
-                <el-icon><Promotion /></el-icon><span class="send-label">发送</span>
+                <el-icon><Promotion /></el-icon><span class="send-label">{{ t('system.ai.chat.send') }}</span>
               </el-button>
               <el-button v-else type="danger" @click="stopStreaming">
-                <el-icon><VideoPause /></el-icon>停止
+                <el-icon><VideoPause /></el-icon>{{ t('system.ai.chat.stop') }}
               </el-button>
             </div>
           </div>
@@ -204,6 +204,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getAllProviders,
@@ -256,6 +257,7 @@ interface ChatSessionItem {
 }
 
 const messagesRef = ref<HTMLElement>()
+const { t } = useI18n()
 const inputText = ref('')
 const streaming = ref(false)
 const enableTools = ref(true)
@@ -288,10 +290,10 @@ const modelOptions = computed(() => {
 })
 
 const suggestions = [
-  { icon: 'User', title: '查询用户', text: '查询系统所有用户' },
-  { icon: 'Avatar', title: '角色管理', text: '系统有哪些角色？' },
-  { icon: 'DataAnalysis', title: '数据统计', text: '获取系统统计信息' },
-  { icon: 'Menu', title: '菜单结构', text: '查看菜单树结构' },
+  { icon: 'User', title: t('system.ai.chat.suggestQueryUser'), text: t('system.ai.chat.suggestQueryUserText') },
+  { icon: 'Avatar', title: t('system.ai.chat.suggestRoleManage'), text: t('system.ai.chat.suggestRoleManageText') },
+  { icon: 'DataAnalysis', title: t('system.ai.chat.suggestDataStat'), text: t('system.ai.chat.suggestDataStatText') },
+  { icon: 'Menu', title: t('system.ai.chat.suggestMenuTree'), text: t('system.ai.chat.suggestMenuTreeText') },
 ]
 
 // ---------- 偏好持久化（供应商/模型） ----------
@@ -421,7 +423,7 @@ async function ensureSession(): Promise<number | null> {
 
 async function switchSession(id: number) {
   if (streaming.value) {
-    ElMessage.warning('AI 正在回复，请稍候')
+    ElMessage.warning(t('system.ai.chat.streaming'))
     return
   }
   activeSessionId.value = id
@@ -436,15 +438,15 @@ async function switchSession(id: number) {
     }))
     scrollToBottom()
   } catch {
-    ElMessage.error('加载会话失败')
+    ElMessage.error(t('system.ai.chat.loadFailed'))
   }
 }
 
 async function confirmDeleteSession(s: ChatSessionItem) {
   try {
-    await ElMessageBox.confirm(`删除会话「${s.title}」？删除后不可恢复`, '提示', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(t('system.ai.chat.deleteSession', { title: s.title }), t('common.feedback.tip'), {
+      confirmButtonText: t('common.actions.delete'),
+      cancelButtonText: t('common.actions.cancel'),
       type: 'warning',
     })
     await deleteChatSession(s.id)
@@ -453,7 +455,7 @@ async function confirmDeleteSession(s: ChatSessionItem) {
       activeSessionId.value = null
       messages.value = []
     }
-    ElMessage.success('会话已删除')
+    ElMessage.success(t('system.ai.chat.sessionDeleted'))
   } catch {
     /* 用户取消 */
   }
@@ -468,7 +470,7 @@ async function persistMessage(role: 'user' | 'assistant', content: string, toolE
     const s = sessions.value.find((x) => x.id === sid)
     if (s) {
       s.message_count += 1
-      if (role === 'user' && s.title === '新对话') s.title = content.slice(0, 50)
+      if (role === 'user' && s.title === t('system.ai.chat.newChatTitle')) s.title = content.slice(0, 50)
     }
   } catch {
     /* 保存失败不阻塞对话 */
@@ -510,7 +512,7 @@ async function sendMessage() {
   if (!text || streaming.value) return
 
   if (providers.value.length === 0) {
-    ElMessage.warning('请先在「模型密钥管理」中添加模型供应商')
+    ElMessage.warning(t('system.ai.chat.providerRequired'))
     return
   }
 
@@ -573,7 +575,7 @@ async function sendMessage() {
       persistMessage('assistant', assistantMsg.content, assistantMsg.toolEvents)
     } else if (event.type === 'error') {
       assistantMsg.streaming = false
-      assistantMsg.error = event.message || '请求失败'
+      assistantMsg.error = event.message || t('system.ai.chat.requestFailed')
       streaming.value = false
     }
   })
@@ -589,7 +591,7 @@ function stopStreaming() {
   if (last && last.streaming) {
     last.streaming = false
     if (!last.content) {
-      last.content = '（已停止）'
+      last.content = t('system.ai.chat.stopped')
     } else {
       persistMessage('assistant', last.content, last.toolEvents)
     }
@@ -598,9 +600,9 @@ function stopStreaming() {
 
 function clearChat() {
   if (messages.value.length === 0) return
-  ElMessageBox.confirm('清空当前对话显示？（历史消息已保存在会话中，可从左侧切换回来）', '提示', {
-    confirmButtonText: '清空',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(t('system.ai.chat.clearConfirm'), t('common.feedback.tip'), {
+    confirmButtonText: t('system.ai.chat.clear'),
+    cancelButtonText: t('common.actions.cancel'),
     type: 'warning',
   })
     .then(() => {
@@ -614,9 +616,9 @@ function clearChat() {
 async function copyMessage(msg: Message) {
   try {
     await navigator.clipboard.writeText(msg.content)
-    ElMessage.success('已复制')
+    ElMessage.success(t('common.feedback.copySuccess'))
   } catch {
-    ElMessage.error('复制失败')
+    ElMessage.error(t('common.feedback.copyFailed'))
   }
 }
 

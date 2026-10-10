@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -42,6 +43,8 @@ var allModels = []interface{}{
 	&model.SysAiProvider{},
 	&model.SysChatSession{},
 	&model.SysChatMessage{},
+	&model.SysLocale{},
+	&model.SysTranslation{},
 }
 
 // Run 应用启动编排
@@ -71,6 +74,9 @@ func Run(configPath string) error {
 	core.SetLogger(logger)
 	core.SeedAiProvider(db)
 
+	// 4.6 加载 DB 翻译覆盖层（语言注册表 + 翻译条目，须在种子之后）
+	core.LoadI18nFromDB(db)
+
 	// 5. （已在 4.5 注入容器）
 	// 6. TokenStore（步骤编号沿用）
 	tokenStore := core.NewMemoryTokenStore()
@@ -81,6 +87,9 @@ func Run(configPath string) error {
 
 	// 8. DAL 初始化
 	dal.Init()
+
+	// 8.5 从数据库读运行时 admin_path 覆盖 config（系统设置里修改后台路径 + 重启后生效）
+	applyRuntimeAdminPath(cfg)
 
 	// 9. 操作日志队列
 	auditQueue := core.NewAuditQueue(db, cfg.Log.OpLogQueueSize)
@@ -130,6 +139,27 @@ type shutdownCtx struct {
 	pluginMgr  *plugin.Manager
 	db         *gorm.DB
 	auditQueue *core.AuditQueue
+}
+
+// applyRuntimeAdminPath 从 sys_setting 表读取 admin_path，覆盖 config.yaml 的值。
+// 规范化：确保 / 开头、去尾斜杠；非法/空值回退 config 默认。
+func applyRuntimeAdminPath(cfg *config.Config) {
+	s, err := dal.GetSetting("admin_path")
+	if err != nil || s == nil || s.Value == "" {
+		return
+	}
+	p := s.Value
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	p = strings.TrimRight(p, "/")
+	if p == "" || p == "/" {
+		return
+	}
+	if p != cfg.App.AdminPath {
+		log.Printf("系统设置：后台访问路径已从数据库加载 %s（config 默认 %s）", p, cfg.App.AdminPath)
+	}
+	cfg.App.AdminPath = p
 }
 
 func runServer(r *gin.Engine, port int, deps *shutdownCtx) error {

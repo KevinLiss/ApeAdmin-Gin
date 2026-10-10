@@ -22,6 +22,7 @@ type UserInfo struct {
 type MenuNode struct {
 	ID         uint        `json:"id"`
 	Name       string      `json:"name"`
+	I18nKey    string      `json:"i18n_key"`
 	ParentID   uint        `json:"parent_id"`
 	Type       string      `json:"type"`
 	Path       string      `json:"path"`

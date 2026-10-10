@@ -21,6 +21,9 @@ type PluginRouteRegistrar func(public, authed *gin.RouterGroup)
 func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRouteRegistrar) {
 	r.GET("/health", HealthCheck)
 
+	// 语言解析（全局，后端消息翻译用）
+	r.Use(middleware.Locale())
+
 	// 全局限流
 	if cfg.Security.RateLimit.Enabled {
 		r.Use(middleware.RateLimit("api", cfg.Security.RateLimit.RequestsPerMinute, time.Minute))
@@ -38,6 +41,11 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 			(&AuthHandler{}).Login,
 		)
 		public.GET("/settings/public", GetPublicSettings)
+
+		// i18n 公开接口（登录页/前端启动即用）
+		i18nPub := public.Group("/i18n")
+		i18nPub.GET("/locales", GetI18nLocales)
+		i18nPub.GET("/messages/:locale", GetI18nMessages)
 	}
 
 	// ─── 认证路由（仅登录）───
@@ -120,6 +128,22 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		settings.PUT("/:key", middleware.RequirePermission("system:setting:edit"), setH.Update)
 		settings.POST("/brand-image", middleware.RequirePermission("system:setting:edit"), setH.BrandImage)
 
+		// 多语言管理
+		i18nGroup := perm.Group("/i18n")
+		localeH := &LocaleHandler{}
+		transH := &TranslationHandler{}
+		// 语言管理（Delete 按语言 code 传，与其他模块按 id 删不同）
+		// 语言管理列表（含停用；GET /i18n/locales 已被公开接口占用，公开版只回启用语言）
+		i18nGroup.GET("/locales/all", middleware.RequirePermission("system:i18n:list"), localeH.List)
+		i18nGroup.POST("/locales", middleware.RequirePermission("system:i18n:add"), localeH.Create)
+		i18nGroup.PUT("/locales/:id", middleware.RequirePermission("system:i18n:edit"), localeH.Update)
+		i18nGroup.DELETE("/locales/:code", middleware.RequirePermission("system:i18n:delete"), localeH.Delete)
+		// 翻译维护
+		i18nGroup.GET("/translations", middleware.RequirePermission("system:i18n:list"), transH.List)
+		i18nGroup.PUT("/translations", middleware.RequirePermission("system:i18n:edit"), transH.BatchSave)
+		i18nGroup.POST("/translations/import", middleware.RequirePermission("system:i18n:edit"), transH.Import)
+		i18nGroup.GET("/translations/export", middleware.RequirePermission("system:i18n:list"), transH.Export)
+
 		// 仪表盘
 		dashboard := perm.Group("/dashboard")
 		dashH := &DashboardHandler{}
@@ -167,26 +191,34 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		registerPlugins(public, perm)
 	}
 
-	// SPA 静态文件服务
+	// SPA 静态文件服务（admin_path 已在 bootstrap 阶段从数据库读出覆盖，改设置 + 重启即生效）
+	adminPath := cfg.App.AdminPath
+	if adminPath == "" {
+		adminPath = "/admin"
+	}
 	if cfg.App.SPADir != "" {
 		if _, err := os.Stat(cfg.App.SPADir); err == nil {
-			// 前端 base 为 /admin/，静态资源挂到 /admin/assets；同时保留 /assets 兼容
+			// 前端 base 为 /admin/，静态资源挂到 admin_path/assets；同时保留 /assets 兼容
 			assetsDir := filepath.Join(cfg.App.SPADir, "assets")
-			if cfg.App.AdminPath != "" {
-				r.Static(cfg.App.AdminPath+"/assets", assetsDir)
+			if adminPath != "" {
+				r.Static(adminPath+"/assets", assetsDir)
 			}
 			r.Static("/assets", assetsDir)
 			r.StaticFile("/favicon.ico", filepath.Join(cfg.App.SPADir, "favicon.ico"))
-			if cfg.App.AdminPath != "" {
-				r.StaticFile(cfg.App.AdminPath+"/favicon.ico", filepath.Join(cfg.App.SPADir, "favicon.ico"))
+			if adminPath != "" {
+				r.StaticFile(adminPath+"/favicon.ico", filepath.Join(cfg.App.SPADir, "favicon.ico"))
 			}
+			// 根路径重定向到后台（与 Python 版 root_redirect 对齐：读数据库 admin_path）
+			r.GET("/", func(c *gin.Context) {
+				c.Redirect(http.StatusFound, adminPath+"/")
+			})
 			// SPA fallback：非 API 路径返回 index.html
 			r.NoRoute(func(c *gin.Context) {
-				if strings.HasPrefix(c.Request.URL.Path, cfg.App.APIPrefix) ||
-					strings.HasPrefix(c.Request.URL.Path, "/health") {
-					c.JSON(http.StatusNotFound, response.Error(404, "接口不存在"))
-					return
-				}
+			if strings.HasPrefix(c.Request.URL.Path, cfg.App.APIPrefix) ||
+				strings.HasPrefix(c.Request.URL.Path, "/health") {
+				c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "common.api_not_found", nil))
+				return
+			}
 				c.File(filepath.Join(cfg.App.SPADir, "index.html"))
 			})
 		} else {

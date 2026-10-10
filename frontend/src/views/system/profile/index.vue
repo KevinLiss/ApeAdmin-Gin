@@ -2,8 +2,8 @@
   <div class="profile-page">
     <!-- 页面标题 -->
     <div class="page-head">
-      <h3>个人中心</h3>
-      <span class="breadcrumb">个人中心 / 我的资料</span>
+      <h3>{{ t('system.profile.title') }}</h3>
+      <span class="breadcrumb">{{ t('menu.profile') }} / {{ t('system.profile.basicInfo') }}</span>
     </div>
 
     <el-row :gutter="20">
@@ -27,22 +27,22 @@
           <div class="profile-meta">
             <div class="meta-item">
               <el-icon><OfficeBuilding /></el-icon>
-              <span class="meta-label">部门</span>
+              <span class="meta-label">{{ t('system.profile.dept') }}</span>
               <span class="meta-value">{{ profile.dept?.name || '—' }}</span>
             </div>
             <div class="meta-item">
               <el-icon><Calendar /></el-icon>
-              <span class="meta-label">创建时间</span>
+              <span class="meta-label">{{ t('system.profile.createTime') }}</span>
               <span class="meta-value">{{ formatDate(profile.created_at) }}</span>
             </div>
             <div class="meta-item">
               <el-icon><Clock /></el-icon>
-              <span class="meta-label">最近登录</span>
+              <span class="meta-label">{{ t('system.profile.lastLogin') }}</span>
               <span class="meta-value">{{ formatDate(profile.last_login_at) }}</span>
             </div>
             <div class="meta-item">
               <el-icon><Location /></el-icon>
-              <span class="meta-label">登录 IP</span>
+              <span class="meta-label">{{ t('system.profile.lastLoginIp') }}</span>
               <span class="meta-value">{{ profile.last_login_ip || '—' }}</span>
             </div>
           </div>
@@ -55,28 +55,28 @@
           <template #header>
             <div class="card-title">
               <el-icon><EditPen /></el-icon>
-              <span>基本资料</span>
+              <span>{{ t('system.profile.basicInfo') }}</span>
             </div>
           </template>
           <el-form :model="editForm" label-width="90px" class="edit-form">
-            <el-form-item label="用户名">
+            <el-form-item :label="t('system.profile.username')">
               <el-input :model-value="profile.username" disabled />
             </el-form-item>
-            <el-form-item label="昵称">
-              <el-input v-model="editForm.nickname" placeholder="请输入昵称" maxlength="50" />
+            <el-form-item :label="t('system.profile.nickname')">
+              <el-input v-model="editForm.nickname" :placeholder="t('system.profile.nicknamePlaceholder')" maxlength="50" />
             </el-form-item>
-            <el-form-item label="邮箱">
-              <el-input v-model="editForm.email" placeholder="请输入邮箱" maxlength="100" />
+            <el-form-item :label="t('system.profile.email')">
+              <el-input v-model="editForm.email" :placeholder="t('system.profile.emailPlaceholder')" maxlength="100" />
             </el-form-item>
-            <el-form-item label="手机号">
-              <el-input v-model="editForm.phone" placeholder="请输入手机号" maxlength="20" />
+            <el-form-item :label="t('system.profile.phone')">
+              <el-input v-model="editForm.phone" :placeholder="t('system.profile.phonePlaceholder')" maxlength="20" />
             </el-form-item>
-            <el-form-item label="头像地址">
-              <el-input v-model="editForm.avatar" placeholder="可选：头像图片 URL" maxlength="500" />
+            <el-form-item :label="t('system.profile.avatarUrl')">
+              <el-input v-model="editForm.avatar" :placeholder="t('system.profile.avatarPlaceholder')" maxlength="500" />
             </el-form-item>
             <el-form-item>
               <el-button type="primary" :loading="saving" @click="saveProfile">
-                <el-icon v-if="!saving"><Check /></el-icon>保存修改
+                <el-icon v-if="!saving"><Check /></el-icon>{{ t('system.profile.saveProfile') }}
               </el-button>
             </el-form-item>
           </el-form>
@@ -86,22 +86,22 @@
           <template #header>
             <div class="card-title">
               <el-icon><Lock /></el-icon>
-              <span>修改密码</span>
+              <span>{{ t('system.profile.changePassword') }}</span>
             </div>
           </template>
           <el-form :model="pwdForm" label-width="90px" class="edit-form">
-            <el-form-item label="原密码">
-              <el-input v-model="pwdForm.old_password" type="password" show-password placeholder="请输入原密码" />
+            <el-form-item :label="t('system.profile.oldPassword')">
+              <el-input v-model="pwdForm.old_password" type="password" show-password :placeholder="t('system.profile.oldPasswordPlaceholder')" />
             </el-form-item>
-            <el-form-item label="新密码">
-              <el-input v-model="pwdForm.new_password" type="password" show-password placeholder="至少 6 位" />
+            <el-form-item :label="t('system.profile.newPassword')">
+              <el-input v-model="pwdForm.new_password" type="password" show-password :placeholder="t('system.profile.newPasswordPlaceholder')" />
             </el-form-item>
-            <el-form-item label="确认新密码">
-              <el-input v-model="pwdForm.confirm" type="password" show-password placeholder="再次输入新密码" />
+            <el-form-item :label="t('system.profile.confirmPassword')">
+              <el-input v-model="pwdForm.confirm" type="password" show-password :placeholder="t('system.profile.confirmPasswordPlaceholder')" />
             </el-form-item>
             <el-form-item>
               <el-button type="warning" :loading="savingPwd" @click="savePassword">
-                <el-icon v-if="!savingPwd"><Key /></el-icon>修改密码
+                <el-icon v-if="!savingPwd"><Key /></el-icon>{{ t('system.profile.changePassword') }}
               </el-button>
             </el-form-item>
           </el-form>
@@ -115,12 +115,14 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import {
   OfficeBuilding, Calendar, Clock, Location, EditPen, Lock, Key, Check,
 } from '@element-plus/icons-vue'
 import { getProfile, updateProfile, changePassword } from '@/api'
 import { useUserStore } from '@/stores/user'
 
+const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -175,13 +177,13 @@ async function saveProfile() {
       phone: editForm.phone,
       avatar: editForm.avatar,
     })
-    ElMessage.success('资料更新成功')
+    ElMessage.success(t('system.profile.updateSuccess'))
     profile.value = { ...profile.value, ...data }
     // 同步更新 Pinia 中的昵称/头像，让顶部导航即时生效
     userStore.nickname = data.nickname ?? userStore.nickname
     userStore.avatar = data.avatar ?? userStore.avatar
   } catch (e: any) {
-    ElMessage.error(e?.message || '保存失败')
+    ElMessage.error(e?.message || t('common.feedback.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -189,15 +191,15 @@ async function saveProfile() {
 
 async function savePassword() {
   if (!pwdForm.old_password || !pwdForm.new_password) {
-    ElMessage.warning('请填写原密码和新密码')
+    ElMessage.warning(t('system.profile.needBothPasswords'))
     return
   }
   if (pwdForm.new_password.length < 6) {
-    ElMessage.warning('新密码至少 6 位')
+    ElMessage.warning(t('system.profile.passwordRule'))
     return
   }
   if (pwdForm.new_password !== pwdForm.confirm) {
-    ElMessage.warning('两次输入的新密码不一致')
+    ElMessage.warning(t('system.profile.passwordMismatch'))
     return
   }
   savingPwd.value = true
@@ -206,14 +208,14 @@ async function savePassword() {
       old_password: pwdForm.old_password,
       new_password: pwdForm.new_password,
     })
-    ElMessage.success('密码修改成功，请重新登录')
+    ElMessage.success(t('system.profile.changeSuccessRelogin'))
     pwdForm.old_password = ''
     pwdForm.new_password = ''
     pwdForm.confirm = ''
     await userStore.logout()
     router.push('/login')
   } catch (e: any) {
-    ElMessage.error(e?.message || '密码修改失败')
+    ElMessage.error(e?.message || t('system.profile.changeFailed'))
   } finally {
     savingPwd.value = false
   }

@@ -210,3 +210,23 @@ export const getDevExampleNotes = (params: any) => request.get('/dev-example/not
 export const createDevExampleNote = (data: any) => request.post('/dev-example/notes', data)
 export const updateDevExampleNote = (id: number, data: any) => request.put(`/dev-example/notes/${id}`, data)
 export const deleteDevExampleNote = (id: number) => request.delete(`/dev-example/notes/${id}`)
+
+// ---- i18n 多语言管理 ----
+// 公开：拉取指定语言的 DB 翻译（{ namespace: { key: value } }）
+export const getI18nMessages = (locale: string) => request.get(`/i18n/messages/${locale}`)
+
+// 管理端：语言 CRUD
+export const getI18nLocalesAll = () => request.get('/i18n/locales/all')
+export const createI18nLocale = (data: any) => request.post('/i18n/locales', data)
+export const updateI18nLocale = (id: number, data: any) => request.put(`/i18n/locales/${id}`, data)
+// 注意：删除按语言 code（如 ja-JP），非数字 id
+export const deleteI18nLocale = (code: string) => request.delete(`/i18n/locales/${encodeURIComponent(code)}`)
+
+// 管理端：翻译维护
+export const getI18nTranslations = (params: { locale: string; namespace: string }) =>
+  request.get('/i18n/translations', { params })
+export const saveI18nTranslations = (data: { locale_code: string; items: Array<{ namespace: string; key: string; value: string }> }) =>
+  request.put('/i18n/translations', data)
+export const importI18nTranslations = (data: any) => request.post('/i18n/translations/import', data)
+export const exportI18nTranslations = (locale: string) =>
+  request.get('/i18n/translations/export', { params: { locale }, responseType: 'blob' })

@@ -1,0 +1,59 @@
+{
+  "dashboard": "Dashboard",
+  "profile": "Profile",
+  "system": {
+    "label": "System",
+    "user": "Users",
+    "role": "Roles",
+    "menu": "Menus",
+    "dept": "Departments",
+    "log": "Audit Logs",
+    "settings": "Settings",
+    "userAdd": "Add User",
+    "userEdit": "Edit User",
+    "userDelete": "Delete User",
+    "userResetPassword": "Reset Password",
+    "roleAdd": "Add Role",
+    "roleEdit": "Edit Role",
+    "roleDelete": "Delete Role",
+    "menuAdd": "Add Menu",
+    "menuEdit": "Edit Menu",
+    "menuDelete": "Delete Menu",
+    "deptAdd": "Add Dept",
+    "deptEdit": "Edit Dept",
+    "deptDelete": "Delete Dept",
+    "logDelete": "Delete Log",
+    "settingsEdit": "Edit Settings",
+    "i18nLocale": "Locales",
+    "i18nTranslation": "Translations",
+    "i18nLocaleAdd": "Add Locale",
+    "i18nLocaleEdit": "Edit Locale",
+    "i18nLocaleDelete": "Delete Locale"
+  },
+  "plugin": {
+    "label": "Plugins",
+    "import": "Import Plugin",
+    "toggle": "Toggle Plugin",
+    "config": "Plugin Config",
+    "delete": "Delete Plugin",
+    "restart": "Restart Plugin"
+  },
+  "mcp": {
+    "label": "MCP",
+    "tools": "MCP Tools",
+    "resources": "MCP Resources",
+    "prompts": "MCP Prompts",
+    "auditLogs": "MCP Audit Logs",
+    "toolCall": "Call Tool"
+  },
+  "ai": {
+    "label": "AI",
+    "chat": "AI Chat",
+    "providers": "Model Keys"
+  },
+  "devExample": {
+    "label": "Dev Examples",
+    "notes": "Notes"
+  },
+  "file": "Files"
+}
