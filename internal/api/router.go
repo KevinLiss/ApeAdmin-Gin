@@ -41,6 +41,9 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 			(&AuthHandler{}).Login,
 		)
 		public.GET("/settings/public", GetPublicSettings)
+		// health 同时注册到 API 前缀下：前端轮询 /api/v1/health（dev 经 vite 代理、
+		// 生产直连），根路径 /health 保留兼容
+		public.GET("/health", HealthCheck)
 
 		// i18n 公开接口（登录页/前端启动即用）
 		i18nPub := public.Group("/i18n")
@@ -127,6 +130,12 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		settings.PUT("", middleware.RequirePermission("system:setting:edit"), setH.BatchUpdate)
 		settings.PUT("/:key", middleware.RequirePermission("system:setting:edit"), setH.Update)
 		settings.POST("/brand-image", middleware.RequirePermission("system:setting:edit"), setH.BrandImage)
+
+		// 系统版本与自更新（顶栏版本更新弹窗）
+		version := perm.Group("/system")
+		verH := &VersionHandler{}
+		version.GET("/version", middleware.RequirePermission("system:setting:list"), verH.GetVersion)
+		version.POST("/update", middleware.RequirePermission("system:setting:edit"), verH.Update)
 
 		// 多语言管理
 		i18nGroup := perm.Group("/i18n")

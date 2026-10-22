@@ -24,8 +24,12 @@
         <span class="version-value">{{ runtimeLabel }}</span>
       </div>
       <div class="version-row">
-        <span class="version-label">{{ t('common.versionUpdate.pythonVersion') }}</span>
-        <span class="version-value">{{ versionData?.python_version || '--' }}</span>
+        <span class="version-label">{{ t('common.versionUpdate.goVersion') }}</span>
+        <span class="version-value">{{ versionData?.go_version || '--' }}</span>
+      </div>
+      <div class="version-row">
+        <span class="version-label">{{ t('common.versionUpdate.platform') }}</span>
+        <span class="version-value">{{ platformLabel }}</span>
       </div>
     </div>
 
@@ -38,7 +42,7 @@
       :limit="1"
       :on-change="handleFileChange"
       :on-exceed="handleExceed"
-      accept=".tar.gz,.tgz"
+      accept=".zip"
       :disabled="uploading"
     >
       <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
@@ -47,7 +51,7 @@
       </div>
       <template #tip>
         <div class="el-upload__tip">
-          {{ t('common.versionUpdate.onlyTarGz') }}
+          {{ t('common.versionUpdate.onlyZip') }}
         </div>
       </template>
     </el-upload>
@@ -129,10 +133,18 @@ const versionData = ref<any>(null)
 
 // Base-stack identity label: backend reports runtime="python"|"go".
 const runtimeLabel = computed(() => {
-  const rt = String(versionData.value?.runtime || 'python').toLowerCase()
+  const rt = String(versionData.value?.runtime || 'go').toLowerCase()
   if (rt === 'go') return t('common.versionUpdate.runtimeGo')
   if (rt === 'python') return t('common.versionUpdate.runtimePython')
   return rt || '--'
+})
+
+// Platform label: OS / arch from the backend (e.g. linux / amd64).
+const platformLabel = computed(() => {
+  const os = versionData.value?.os
+  const arch = versionData.value?.arch
+  if (!os && !arch) return '--'
+  return `${os || '--'} / ${arch || '--'}`
 })
 
 async function fetchVersion() {
@@ -167,7 +179,7 @@ function handleFileChange(file: UploadFile, files: UploadFiles) {
   const raw = file.raw as UploadRawFile
   // Validate extension
   const name = raw.name.toLowerCase()
-  if (!name.endsWith('.tar.gz') && !name.endsWith('.tgz')) {
+  if (!name.endsWith('.zip')) {
     errorMsg.value = t('common.versionUpdate.invalidFormat')
     selectedFile.value = null
     uploadRef.value?.clearFiles()
@@ -240,16 +252,16 @@ async function handleUpload() {
       uploading.value = false
     }
     } catch (err: any) {
-    progressStatus.value = 'exception'
-    // Backend returns { code, msg, data } in the standard envelope.
-    errorMsg.value =
-      err?.response?.data?.msg
-      || err?.response?.data?.detail?.msg
-      || err?.response?.data?.detail
-      || err?.message
-      || t('common.versionUpdate.uploadFailed')
-    uploading.value = false
-  }
+      progressStatus.value = 'exception'
+      // Backend returns { code, msg, data } in the standard envelope.
+      errorMsg.value =
+        err?.response?.data?.msg
+        || err?.response?.data?.detail?.msg
+        || err?.response?.data?.detail
+        || err?.message
+        || t('common.versionUpdate.uploadFailed')
+      uploading.value = false
+    }
 }
 
 function handleClose() {

@@ -78,6 +78,13 @@ var builtinMessages = map[string]map[string]string{
 		"dept.has_users":       "部门下存在用户，无法删除",
 		"dept.name_exists":     "同级下已存在同名部门",
 
+		// 版本更新
+		"version.zip_only":   "仅支持 .zip 格式部署包",
+		"version.too_large":  "部署包大小不能超过 200MB",
+		"version.prepare_fail": "准备更新失败",
+		"version.save_fail":  "保存上传文件失败",
+		"version.update_ok":  "版本更新完成，后端正在重启，请等待约 5 秒后自动刷新",
+
 		// 日志
 		"log.not_found": "日志不存在",
 
@@ -183,6 +190,13 @@ var builtinMessages = map[string]map[string]string{
 		"dept.has_children":    "Cannot delete: sub-departments exist",
 		"dept.has_users":       "Cannot delete: users are still assigned to this department",
 		"dept.name_exists":     "A department with the same name already exists at this level",
+
+		// Version update
+		"version.zip_only":   "Only .zip deployment packages are supported",
+		"version.too_large":  "The package size cannot exceed 200MB",
+		"version.prepare_fail": "Failed to prepare the update",
+		"version.save_fail":  "Failed to save the uploaded file",
+		"version.update_ok":  "Update completed. The backend is restarting; the page will refresh in ~5 seconds",
 
 		// Log
 		"log.not_found": "Log not found",
