@@ -39,9 +39,10 @@
         <el-tree-select
           v-model="form.parent_id"
           :data="parentOptions"
-          :props="{ label: 'name', children: 'children' }"
+          :props="{ value: 'id', label: 'name', children: 'children' }"
           check-strictly
           clearable
+          @clear="form.parent_id = 0"
           :placeholder="t('system.dept.parentPlaceholder')"
           style="width: 100%"
         />
@@ -103,11 +104,47 @@ async function fetchData() {
   loading.value = true
   try {
     const data: any = await getDeptTree()
-    tree.value = data || []
-    parentOptions.value = [{ id: 0, name: t('system.menu.root'), children: data || [] }]
+    tree.value = buildTree(data || [])
+    parentOptions.value = buildParentOptions(editingId.value)
   } finally {
     loading.value = false
   }
+}
+
+// buildTree 将后端返回的平铺列表构建为树（孤儿节点自动挂到根，防止 parent 丢失导致部门不显示）
+function buildTree(list: any[]): any[] {
+  const byId = new Map<number, any>()
+  list.forEach((d) => byId.set(d.id, { ...d, children: [] }))
+  const roots: any[] = []
+  list.forEach((d) => {
+    const node = byId.get(d.id)
+    const parent = byId.get(d.parent_id ?? 0)
+    if (parent && parent !== node) {
+      parent.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  const sortRec = (nodes: any[]) => {
+    nodes.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+    nodes.forEach((n) => sortRec(n.children))
+  }
+  sortRec(roots)
+  return roots
+}
+
+// removeBranch 编辑时排除自身及其子孙，防止把上级选成自己的子部门形成环
+function removeBranch(nodes: any[], excludedId: number | null): any[] {
+  return nodes
+    .filter((node) => node.id !== excludedId)
+    .map((node) => ({
+      ...node,
+      children: removeBranch(node.children || [], excludedId),
+    }))
+}
+
+function buildParentOptions(excludedId: number | null = null) {
+  return [{ id: 0, name: t('system.menu.root'), children: removeBranch(tree.value, excludedId) }]
 }
 
 function openDialog(row?: any) {
@@ -118,6 +155,7 @@ function openDialog(row?: any) {
   form.phone = row?.phone ?? ''
   form.sort = row?.sort ?? 0
   form.status = row?.status ?? 1
+  parentOptions.value = buildParentOptions(editingId.value)
   dialogVisible.value = true
 }
 
@@ -128,7 +166,7 @@ async function handleSave() {
     saving.value = true
     try {
       const payload = {
-        parent_id: form.parent_id,
+        parent_id: Number(form.parent_id) || 0,
         name: form.name,
         leader: form.leader,
         phone: form.phone,

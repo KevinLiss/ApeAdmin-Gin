@@ -71,6 +71,13 @@ var builtinMessages = map[string]map[string]string{
 		"role.not_found":   "角色不存在",
 		"role.code_exists": "角色编码已存在",
 
+		// 部门
+		"dept.parent_not_found": "上级部门不存在",
+		"dept.parent_invalid":   "上级部门不能是自身或其子部门",
+		"dept.has_children":    "存在子部门，无法删除",
+		"dept.has_users":       "部门下存在用户，无法删除",
+		"dept.name_exists":     "同级下已存在同名部门",
+
 		// 日志
 		"log.not_found": "日志不存在",
 
@@ -169,6 +176,13 @@ var builtinMessages = map[string]map[string]string{
 		// Role
 		"role.not_found":   "Role not found",
 		"role.code_exists": "Role code already exists",
+
+		// Dept
+		"dept.parent_not_found": "Parent department not found",
+		"dept.parent_invalid":   "The parent department cannot be itself or one of its sub-departments",
+		"dept.has_children":    "Cannot delete: sub-departments exist",
+		"dept.has_users":       "Cannot delete: users are still assigned to this department",
+		"dept.name_exists":     "A department with the same name already exists at this level",
 
 		// Log
 		"log.not_found": "Log not found",

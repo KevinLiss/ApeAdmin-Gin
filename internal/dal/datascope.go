@@ -72,12 +72,16 @@ func descendantDeptIDs(deptID *uint) []uint {
 		childrenMap[d.ParentID] = append(childrenMap[d.ParentID], d.ID)
 	}
 	queue := []uint{*deptID}
+	visited := map[uint]bool{*deptID: true}
 	for len(queue) > 0 {
 		curr := queue[0]
 		queue = queue[1:]
 		for _, childID := range childrenMap[curr] {
-			result = append(result, childID)
-			queue = append(queue, childID)
+			if !visited[childID] {
+				visited[childID] = true
+				result = append(result, childID)
+				queue = append(queue, childID)
+			}
 		}
 	}
 	return result

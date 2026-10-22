@@ -45,7 +45,7 @@
         <el-tree-select
           v-model="form.parent_id"
           :data="parentOptions"
-          :props="{ label: 'name', children: 'children' }"
+          :props="{ value: 'id', label: 'name', children: 'children' }"
           check-strictly
           clearable
           @clear="form.parent_id = 0"

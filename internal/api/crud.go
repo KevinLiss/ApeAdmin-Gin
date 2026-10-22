@@ -196,6 +196,22 @@ func (h *DeptHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
 		return
 	}
+	if dept.Name == "" {
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
+		return
+	}
+	// 上级部门存在性校验（parent_id=0 表示顶级）
+	if dept.ParentID > 0 {
+		if _, err := dal.GetDeptByID(dept.ParentID); err != nil {
+			c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "dept.parent_not_found", nil))
+			return
+		}
+	}
+	// 同级同名查重
+	if exists, err := dal.ExistsDeptName(dept.ParentID, dept.Name, 0); err == nil && exists {
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "dept.name_exists", nil))
+		return
+	}
 	if dept.Status == 0 { dept.Status = 1 }
 	if err := dal.CreateDept(&dept); err != nil {
 		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.create_fail", nil))
@@ -212,6 +228,30 @@ func (h *DeptHandler) Update(c *gin.Context) {
 		return
 	}
 	dept.ID = uint(id)
+	if dept.Name == "" {
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "common.param_error", nil))
+		return
+	}
+	// 上级部门校验：存在性 + 不能选自身（环）+ 不能选自己的子孙（环）
+	if dept.ParentID > 0 {
+		if dept.ParentID == dept.ID {
+			c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "dept.parent_invalid", nil))
+			return
+		}
+		if _, err := dal.GetDeptByID(dept.ParentID); err != nil {
+			c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "dept.parent_not_found", nil))
+			return
+		}
+		if dal.IsDeptDescendant(dept.ID, dept.ParentID) {
+			c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "dept.parent_invalid", nil))
+			return
+		}
+	}
+	// 同级同名查重（排除自身）
+	if exists, err := dal.ExistsDeptName(dept.ParentID, dept.Name, dept.ID); err == nil && exists {
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "dept.name_exists", nil))
+		return
+	}
 	if err := dal.UpdateDept(&dept); err != nil {
 		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.update_fail", nil))
 		return
@@ -221,6 +261,16 @@ func (h *DeptHandler) Update(c *gin.Context) {
 
 func (h *DeptHandler) Delete(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	// 存在子部门时禁止删除（避免孤儿部门）
+	if childCount, err := dal.CountChildDepts(uint(id)); err == nil && childCount > 0 {
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "dept.has_children", nil))
+		return
+	}
+	// 部门下还有用户时禁止删除（避免用户外键悬挂）
+	if userCount, err := dal.CountUsersInDept(uint(id)); err == nil && userCount > 0 {
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "dept.has_users", nil))
+		return
+	}
 	if err := dal.DeleteDept(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.delete_fail", nil))
 		return
