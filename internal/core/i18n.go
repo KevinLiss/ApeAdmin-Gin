@@ -66,6 +66,9 @@ var builtinMessages = map[string]map[string]string{
 		"user.label":          "用户",
 		"user.username_exists": "用户名已存在",
 		"user.pwd_hash_fail":   "密码加密失败",
+		"user.cannot_delete_self": "不能删除当前登录用户",
+		"user.last_super_admin":  "不能删除最后一个超级管理员",
+		"user.kicked":          "该用户已被强制下线",
 
 		// 角色
 		"role.not_found":   "角色不存在",
@@ -77,6 +80,8 @@ var builtinMessages = map[string]map[string]string{
 		"dept.has_children":    "存在子部门，无法删除",
 		"dept.has_users":       "部门下存在用户，无法删除",
 		"dept.name_exists":     "同级下已存在同名部门",
+		"menu.has_children":    "存在子菜单，无法删除",
+		"file.svg_unsafe":      "SVG 含可执行脚本，已拒绝（存储型 XSS 防护）",
 
 		// 版本更新
 		"version.zip_only":   "仅支持 .zip 格式部署包",
@@ -179,6 +184,9 @@ var builtinMessages = map[string]map[string]string{
 		"user.label":          "user",
 		"user.username_exists": "Username already exists",
 		"user.pwd_hash_fail":   "Failed to hash password",
+		"user.cannot_delete_self": "You cannot delete the currently logged-in user",
+		"user.last_super_admin":  "You cannot delete the last super admin",
+		"user.kicked":          "The user has been forced offline",
 
 		// Role
 		"role.not_found":   "Role not found",
@@ -190,6 +198,8 @@ var builtinMessages = map[string]map[string]string{
 		"dept.has_children":    "Cannot delete: sub-departments exist",
 		"dept.has_users":       "Cannot delete: users are still assigned to this department",
 		"dept.name_exists":     "A department with the same name already exists at this level",
+		"menu.has_children":    "Cannot delete: sub-menus exist",
+		"file.svg_unsafe":      "The SVG contains active content and was rejected (stored XSS protection)",
 
 		// Version update
 		"version.zip_only":   "Only .zip deployment packages are supported",

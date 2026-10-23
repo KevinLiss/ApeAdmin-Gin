@@ -81,6 +81,12 @@ func Run(configPath string) error {
 	// 6. TokenStore（步骤编号沿用）
 	tokenStore := core.NewMemoryTokenStore()
 	core.SetTokenStore(tokenStore)
+	// 后台定期清理过期黑名单条目（IsRevoked 有惰性清理，此处兜底批量回收）
+	go func() {
+		for range time.Tick(30 * time.Minute) {
+			tokenStore.CleanupExpired()
+		}
+	}()
 
 	// 7. JWT 配置
 	core.SetJWTConfig(&cfg.JWT)

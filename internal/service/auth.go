@@ -1,10 +1,75 @@
 package service
 
 import (
+	"sync"
+	"time"
+
 	"apeadmin-gin/internal/dal"
 	"apeadmin-gin/internal/model"
 	"apeadmin-gin/internal/schema"
 )
+
+// ────────────────────────────────────────────────────────────────────────────
+// 权限缓存
+//
+// 背景：RequirePermission 中间件原先每个请求触发 2+N 次查库
+// （用户+角色 Preload、每角色一条 Raw SQL），是 API 全链路最大热点。
+//
+// 实现：
+//   - 进程内 TTL 缓存（默认 30s），userID → 权限集合
+//   - 角色变更（AssignRoleMenus / 角色启停 / 角色删除）时主动失效
+//   - 单机部署；多实例时 TTL 兜底一致性（30s 内其他实例仍用旧权限，可接受）
+// ────────────────────────────────────────────────────────────────────────────
+
+const permCacheTTL = 30 * time.Second
+
+type permCacheEntry struct {
+	perms     map[string]bool
+	expiresAt time.Time
+}
+
+var (
+	permMu    sync.RWMutex
+	permCache = make(map[uint]*permCacheEntry)
+)
+
+// GetUserPermissionsCached 带缓存的用户权限查询（中间件用）
+func GetUserPermissionsCached(userID uint) map[string]bool {
+	permMu.RLock()
+	if e, ok := permCache[userID]; ok && time.Now().Before(e.expiresAt) {
+		perms := e.perms
+		permMu.RUnlock()
+		return perms
+	}
+	permMu.RUnlock()
+
+	perms := GetUserPermissions(userID)
+
+	permMu.Lock()
+	permCache[userID] = &permCacheEntry{perms: perms, expiresAt: time.Now().Add(permCacheTTL)}
+	permMu.Unlock()
+	return perms
+}
+
+// InvalidateUserPermCache 失效单个用户的权限缓存
+// （用户角色重新分配 / 用户删除 / 密码重置后调用）
+func InvalidateUserPermCache(userID uint) {
+	permMu.Lock()
+	delete(permCache, userID)
+	permMu.Unlock()
+}
+
+// InvalidateAllPermCache 全量失效
+// （角色变更影响该角色下所有用户，无法精确列举，整体清空最安全）
+func InvalidateAllPermCache() {
+	permMu.Lock()
+	permCache = make(map[uint]*permCacheEntry)
+	permMu.Unlock()
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 以下为无缓存原始实现（供缓存层与测试调用）
+// ────────────────────────────────────────────────────────────────────────────
 
 // GetUserPermissions 获取用户权限集合
 func GetUserPermissions(userID uint) map[string]bool {

@@ -166,7 +166,8 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	if v, ok := jti.(string); ok {
 		jtiStr = v
 	}
-	if err := service.Logout(jtiStr); err != nil {
+	userID := c.GetUint("user_id")
+	if err := service.Logout(userID, jtiStr); err != nil {
 		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "auth.logout_fail", nil))
 		return
 	}

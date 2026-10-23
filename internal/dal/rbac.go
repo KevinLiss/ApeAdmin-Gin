@@ -125,6 +125,13 @@ func CountChildDepts(parentID uint) (int64, error) {
 	return count, err
 }
 
+// CountChildMenus 统计直属子菜单数量（用于删除前检查）
+func CountChildMenus(parentID uint) (int64, error) {
+	var count int64
+	err := gormDB.Model(&model.SysMenu{}).Where("parent_id = ?", parentID).Count(&count).Error
+	return count, err
+}
+
 // CountUsersInDept 统计挂在该部门下的用户数量（用于删除前检查）
 func CountUsersInDept(deptID uint) (int64, error) {
 	var count int64

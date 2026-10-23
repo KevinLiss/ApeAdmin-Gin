@@ -26,6 +26,24 @@ var (
 	lgRecords = make(map[string]*loginGuardEntry) // key = ip + "|" + username
 )
 
+func init() {
+	// 后台 sweeper：定期清理过期的登录防护记录
+	// （锁定已过期且无后续失败的条目回收，防止公网恶意扫描撑爆内存）
+	go func() {
+		for range time.Tick(10 * time.Minute) {
+			lgMu.Lock()
+			now := time.Now()
+			for key, e := range lgRecords {
+				// 锁定期已过且 30 分钟无新失败 → 回收
+				if now.After(e.lockedUntil) && now.Sub(e.firstFail) > 30*time.Minute {
+					delete(lgRecords, key)
+				}
+			}
+			lgMu.Unlock()
+		}
+	}()
+}
+
 // LoginGuard 登录防爆破中间件（IP+用户名双滑窗计数锁定）
 func LoginGuard() gin.HandlerFunc {
 	return func(c *gin.Context) {

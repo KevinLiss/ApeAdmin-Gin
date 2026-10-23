@@ -21,7 +21,13 @@
     "confirmDelete": "Are you sure you want to delete user \"{name}\"?",
     "uploadAvatar": "Upload avatar",
     "usernameRequired": "Please enter a username",
-    "selectRole": "Select roles"
+    "selectRole": "Select roles",
+    "onlineUsers": "Online Users",
+    "lastActive": "Last Active",
+    "kick": "Kick",
+    "kicked": "User has been forced offline",
+    "confirmKick": "Force user \"{name}\" offline? All their sessions will be invalidated immediately.",
+    "onlineTip": "{n} active sessions (active within 15 minutes counts as online)"
   },
   "role": {
     "title": "Role Management",

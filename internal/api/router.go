@@ -44,6 +44,8 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		// health 同时注册到 API 前缀下：前端轮询 /api/v1/health（dev 经 vite 代理、
 		// 生产直连），根路径 /health 保留兼容
 		public.GET("/health", HealthCheck)
+		// token 刷新：必须免登录（access 过期后才能换新，放 authed 组会死锁）
+		public.POST("/auth/refresh", (&AuthHandler{}).RefreshToken)
 
 		// i18n 公开接口（登录页/前端启动即用）
 		i18nPub := public.Group("/i18n")
@@ -61,7 +63,6 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		auth.PUT("/profile", (&AuthHandler{}).UpdateProfile)
 		auth.PUT("/profile/password", (&AuthHandler{}).ChangePassword)
 		auth.POST("/logout", (&AuthHandler{}).Logout)
-		auth.POST("/refresh", (&AuthHandler{}).RefreshToken)
 	}
 
 	// ─── 权限路由 ───
@@ -77,6 +78,8 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		users.PUT("/:id", middleware.RequirePermission("system:user:edit"), userH.Update)
 		users.DELETE("/:id", middleware.RequirePermission("system:user:delete"), userH.Delete)
 		users.PUT("/:id/reset-password", middleware.RequirePermission("system:user:reset-password"), userH.ResetPassword)
+		users.GET("/online/list", middleware.RequirePermission("system:user:list"), userH.OnlineList)
+		users.POST("/:id/kick", middleware.RequirePermission("system:user:edit"), userH.Kick)
 
 		// 角色管理
 		roles := perm.Group("/roles")

@@ -53,15 +53,18 @@ func GenerateAccessToken(user *model.SysUser) (string, error) {
 }
 
 // GenerateRefreshToken 生成 refresh token
-func GenerateRefreshToken(userID uint) (string, error) {
+// 携带 TokenVersion（改密/禁用后 tv+1，旧 refresh 立即失效）与 jti（支持轮换撤销）
+func GenerateRefreshToken(user *model.SysUser) (string, error) {
 	cfg := getJWTConfig()
 	claims := Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   strconv.Itoa(int(userID)),
+			ID:        uuid.NewString(),
+			Subject:   strconv.Itoa(int(user.ID)),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(cfg.RefreshExpireDays) * 24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
-		Type: "refresh",
+		Type:         "refresh",
+		TokenVersion: user.TokenVersion,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(cfg.Secret))

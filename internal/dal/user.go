@@ -1,6 +1,9 @@
 package dal
 
 import (
+	"fmt"
+	"time"
+
 	"apeadmin-gin/internal/model"
 
 	"gorm.io/gorm"
@@ -39,8 +42,8 @@ func GetUserWithRoles(id uint) (*model.SysUser, error) {
 	return &user, nil
 }
 
-// ListUsers 分页查询用户
-func ListUsers(page, pageSize int, keyword string) ([]model.SysUser, int64, error) {
+// ListUsers 分页查询用户（可叠加数据权限 scope）
+func ListUsers(page, pageSize int, keyword string, scope ...func(*gorm.DB) *gorm.DB) ([]model.SysUser, int64, error) {
 	db := getDB()
 	var users []model.SysUser
 	var total int64
@@ -48,6 +51,12 @@ func ListUsers(page, pageSize int, keyword string) ([]model.SysUser, int64, erro
 	query := db.Model(&model.SysUser{})
 	if keyword != "" {
 		query = query.Where("username LIKE ? OR nickname LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+	}
+	// 数据权限过滤（本人/本部门/本部门及以下/全部——见 datascope.go）
+	for _, s := range scope {
+		if s != nil {
+			query = query.Scopes(s)
+		}
 	}
 	query.Count(&total)
 	err := query.Preload("Roles").Preload("Dept").
@@ -66,9 +75,38 @@ func UpdateUser(user *model.SysUser) error {
 	return getDB().Save(user).Error
 }
 
-// DeleteUser 软删除用户
+// DeleteUser 软删除用户（清角色关联 + username 加删除后缀避开 uniqueIndex + tv+1 失效其全部 token）
 func DeleteUser(id uint) error {
-	return getDB().Delete(&model.SysUser{}, id).Error
+	db := getDB()
+	return db.Transaction(func(tx *gorm.DB) error {
+		var user model.SysUser
+		if err := tx.First(&user, id).Error; err != nil {
+			return err
+		}
+		// 清理用户-角色关联，避免脏数据残留
+		if err := tx.Model(&user).Association("Roles").Clear(); err != nil {
+			return err
+		}
+		// 软删后 username 改名：uniqueIndex 下同名新用户可正常创建
+		newName := fmt.Sprintf("__deleted__%s__%d__", user.Username, time.Now().Unix())
+		if err := tx.Model(&model.SysUser{}).Where("id = ?", id).
+			Updates(map[string]interface{}{
+				"username":      newName,
+				"token_version": gorm.Expr("token_version + 1"), // 其在线 token 立即失效
+				"status":        0,
+			}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.SysUser{}, id).Error // gorm 软删（deleted_at）
+	})
+}
+
+// CountSuperAdmins 统计启用的超级管理员数量（删除保护用）
+func CountSuperAdmins() (int64, error) {
+	var count int64
+	err := getDB().Model(&model.SysUser{}).
+		Where("is_super_admin = ? AND status = 1", true).Count(&count).Error
+	return count, err
 }
 
 // UpdateUserPassword 更新用户密码

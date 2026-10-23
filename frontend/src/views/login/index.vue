@@ -1,6 +1,31 @@
 <template>
   <!-- ApeAdmin 登录页 -->
   <div class="login-page" :style="loginBgStyle">
+    <!-- 语言切换（页面右上角悬浮） -->
+    <div class="login-lang-switch">
+      <el-dropdown trigger="click" popper-class="login-lang-popper" @command="switchLanguage">
+        <button class="lang-trigger" type="button">
+          <el-icon :size="15"><Globe /></el-icon>
+          <span class="lang-trigger-label">{{ currentLabel }}</span>
+          <el-icon class="lang-caret" :size="12"><ArrowDown /></el-icon>
+        </button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item
+              v-for="l in localeOptions"
+              :key="l.code"
+              :command="l.code"
+              :class="{ 'is-current': l.code === currentLocale }"
+            >
+              <span class="lang-check">
+                <el-icon v-if="l.code === currentLocale" :size="13"><Check /></el-icon>
+              </span>
+              {{ l.label }}
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
     <div class="login-container">
       <!-- 左侧品牌展示区 -->
       <div class="login-brand">
@@ -39,18 +64,6 @@
       <!-- 右侧登录表单区 -->
       <div class="login-form-wrapper">
         <div class="login-form-card">
-          <!-- 语言切换 -->
-          <div class="login-lang-switch">
-            <button
-              v-for="l in localeOptions"
-              :key="l.code"
-              class="lang-btn"
-              :class="{ active: l.code === currentLocale }"
-              @click="switchLanguage(l.code)"
-            >
-              {{ l.label }}
-            </button>
-          </div>
           <div class="form-header">
             <h2>{{ t('auth.login.accountLogin') }}</h2>
             <p>{{ t('auth.login.accountLoginTip') }}</p>
@@ -176,6 +189,9 @@ const { t, locale } = useI18n()
 // ===== 语言切换 =====
 const localeOptions = SUPPORTED_LOCALES.map((l) => ({ code: l.code, label: l.label }))
 const currentLocale = computed(() => locale.value)
+const currentLabel = computed(
+  () => localeOptions.find((l) => l.code === currentLocale.value)?.label ?? localeOptions[0]?.label ?? '',
+)
 function switchLanguage(code: string) {
   if (code === currentLocale.value) return
   setLocale(code)
@@ -339,6 +355,7 @@ const captchaKey = ref(0)
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
+  position: relative;
 }
 
 .login-container {
@@ -469,31 +486,43 @@ const captchaKey = ref(0)
   max-width: 360px;
 }
 
-/* ===== 语言切换 ===== */
+/* ===== 语言切换（右上角毛玻璃胶囊） ===== */
 .login-lang-switch {
-  display: flex;
-  justify-content: flex-end;
+  position: absolute;
+  top: 22px;
+  right: 26px;
+  z-index: 10;
+}
+.lang-trigger {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  margin-bottom: 12px;
-}
-.lang-btn {
-  padding: 4px 12px;
-  font-size: 12px;
-  border: 1px solid #e4e7ed;
-  border-radius: 6px;
-  background: transparent;
-  color: #8a8a9a;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.lang-btn:hover {
-  color: #5a67f5;
-  border-color: #c6c9ff;
-}
-.lang-btn.active {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
   color: #fff;
-  background: #5a67f5;
-  border-color: #5a67f5;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+.lang-trigger:hover {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.lang-trigger:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+.lang-trigger-label {
+  line-height: 1;
+}
+.lang-caret {
+  margin-left: 1px;
+  opacity: 0.85;
 }
 
 .form-header {
@@ -753,5 +782,25 @@ const captchaKey = ref(0)
 /* 自定义背景图时加遮罩保证可读性 */
 .login-page[style*="url"] .login-container {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+</style>
+
+<style>
+/* 语言切换下拉菜单（挂载在 body，需全局样式） */
+.login-lang-popper .el-dropdown-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 150px;
+}
+.login-lang-popper .lang-check {
+  display: inline-flex;
+  width: 18px;
+  color: var(--el-color-primary, #5a67f5);
+}
+.login-lang-popper .el-dropdown-menu__item.is-current {
+  color: var(--el-color-primary, #5a67f5);
+  font-weight: 600;
+  background: rgba(90, 103, 245, 0.08);
 }
 </style>

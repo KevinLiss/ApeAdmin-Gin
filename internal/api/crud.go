@@ -2,6 +2,8 @@ package api
 
 import (
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -9,11 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"apeadmin-gin/internal/core"
-	"apeadmin-gin/internal/dal"
 	"apeadmin-gin/internal/model"
+
+	"github.com/gin-gonic/gin"
+	"apeadmin-gin/internal/dal"
 	"apeadmin-gin/internal/pkg/response"
+	"apeadmin-gin/internal/service"
 )
 
 type RoleHandler struct{}
@@ -79,6 +83,7 @@ func (h *RoleHandler) Create(c *gin.Context) {
 	if len(req.MenuIDs) > 0 {
 		dal.AssignRoleMenus(role.ID, req.MenuIDs)
 	}
+	service.InvalidateAllPermCache() // 角色菜单变更，全量失效权限缓存
 	c.JSON(http.StatusOK, response.Success(role))
 }
 
@@ -113,6 +118,7 @@ func (h *RoleHandler) Update(c *gin.Context) {
 	if req.MenuIDs != nil {
 		dal.AssignRoleMenus(role.ID, req.MenuIDs)
 	}
+	service.InvalidateAllPermCache() // 角色菜单变更，全量失效权限缓存
 	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.update_ok", nil))
 }
 
@@ -170,10 +176,16 @@ func (h *MenuHandler) Update(c *gin.Context) {
 
 func (h *MenuHandler) Delete(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	// 有子菜单时禁止删除（避免悬空菜单节点）
+	if childCount, err := dal.CountChildMenus(uint(id)); err == nil && childCount > 0 {
+		c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "menu.has_children", nil))
+		return
+	}
 	if err := dal.DeleteMenu(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "common.delete_fail", nil))
 		return
 	}
+	service.InvalidateAllPermCache() // 菜单删除影响权限码，全量失效缓存
 	c.JSON(http.StatusOK, response.SuccessCtx(c, "common.delete_ok", nil))
 }
 
@@ -390,6 +402,14 @@ func (h *SettingHandler) BrandImage(c *gin.Context) {
 		return
 	}
 
+	// SVG 内容安全检查：拒绝含脚本/事件属性的 SVG（存储型 XSS 防护）
+	if ext == ".svg" {
+		if err := checkSVGSafety(file); err != nil {
+			c.JSON(http.StatusBadRequest, response.ErrorCtx(c, 400, "file.svg_unsafe", nil))
+			return
+		}
+	}
+
 	// 保存到 uploads/brand/ 目录
 	dir := filepath.Join(cfg.File.StorageDir, "brand")
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -406,4 +426,30 @@ func (h *SettingHandler) BrandImage(c *gin.Context) {
 	// 返回可访问 URL（通过静态托管 /uploads 前缀映射到 storage_dir）
 	url := fmt.Sprintf("/uploads/brand/%s", filename)
 	c.JSON(http.StatusOK, response.Success(gin.H{"url": url}))
+}
+
+// checkSVGSafety 检查 SVG 内容是否含可执行脚本（script 标签 / on* 事件属性 / javascript: 协议）
+func checkSVGSafety(fileHeader *multipart.FileHeader) error {
+	if fileHeader.Size > 2*1024*1024 { // SVG 很小，超 2MB 直接拒绝检查读取
+		return fmt.Errorf("svg too large")
+	}
+	f, err := fileHeader.Open()
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, 2*1024*1024))
+	if err != nil {
+		return err
+	}
+	content := strings.ToLower(string(data))
+	if strings.Contains(content, "<script") ||
+		strings.Contains(content, "onload=") ||
+		strings.Contains(content, "onerror=") ||
+		strings.Contains(content, "onclick=") ||
+		strings.Contains(content, "javascript:") ||
+		strings.Contains(content, "onmouseover=") {
+		return fmt.Errorf("svg contains active content")
+	}
+	return nil
 }

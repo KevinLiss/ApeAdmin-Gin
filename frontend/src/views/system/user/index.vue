@@ -15,6 +15,9 @@
     <el-button type="success" @click="openDialog()" v-permission="'system:user:add'">
       <el-icon><Plus /></el-icon>{{ t('common.actions.add') }}
     </el-button>
+    <el-button type="warning" @click="openOnline" v-permission="'system:user:list'">
+      <el-icon><Monitor /></el-icon>{{ t('system.user.onlineUsers') }}
+    </el-button>
     </div>
 
     <!-- Table -->
@@ -91,6 +94,27 @@
       <el-button type="primary" :loading="saving" @click="handleSave">{{ t('common.actions.save') }}</el-button>
     </template>
   </el-dialog>
+
+  <!-- 在线用户抽屉 -->
+  <el-drawer v-model="onlineVisible" :title="t('system.user.onlineUsers')" size="520px">
+    <el-table :data="onlineSessions" v-loading="onlineLoading" size="small">
+      <el-table-column prop="username" :label="t('system.user.username')" width="110" />
+      <el-table-column prop="ip" label="IP" width="120" />
+      <el-table-column :label="t('system.user.lastActive')" width="160">
+        <template #default="{ row }">{{ formatTime(row.last_seen) }}</template>
+      </el-table-column>
+      <el-table-column :label="t('common.actions.operation')" width="80">
+        <template #default="{ row }">
+          <el-button link type="danger" @click="handleKick(row)" v-permission="'system:user:edit'">
+            {{ t('system.user.kick') }}
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #footer>
+      <div style="color: #909399; font-size: 12px">{{ t('system.user.onlineTip', { n: onlineSessions.length }) }}</div>
+    </template>
+  </el-drawer>
 </template>
 
 <script setup lang="ts">
@@ -98,7 +122,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { getUsers, createUser, updateUser, deleteUser, getAllRoles } from '@/api'
+import { getUsers, createUser, updateUser, deleteUser, getAllRoles, getOnlineUsers, kickUser } from '@/api'
 
 const { t } = useI18n()
 
@@ -205,6 +229,33 @@ async function handleDelete(row: UserRow) {
   await deleteUser(row.id)
   ElMessage.success(t('common.feedback.deleteSuccess'))
   fetchData()
+}
+
+// ─── 在线用户 ───
+const onlineVisible = ref(false)
+const onlineLoading = ref(false)
+const onlineSessions = ref<any[]>([])
+
+async function openOnline() {
+  onlineVisible.value = true
+  await loadOnline()
+}
+
+async function loadOnline() {
+  onlineLoading.value = true
+  try {
+    const data: any = await getOnlineUsers()
+    onlineSessions.value = data?.sessions || []
+  } finally {
+    onlineLoading.value = false
+  }
+}
+
+async function handleKick(row: any) {
+  await ElMessageBox.confirm(t('system.user.confirmKick', { name: row.username }), t('common.feedback.tip'), { type: 'warning' })
+  await kickUser(row.user_id)
+  ElMessage.success(t('system.user.kicked'))
+  loadOnline()
 }
 
 function formatTime(time: string) {

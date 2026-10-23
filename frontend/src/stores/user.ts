@@ -32,6 +32,9 @@ export const useUserStore = defineStore('user', {
       const data: any = await loginApi({ username, password, ...captcha })
       this.token = data.access_token
       localStorage.setItem('apeadmin_token', data.access_token)
+      if (data.refresh_token) {
+        localStorage.setItem('apeadmin_refresh_token', data.refresh_token)
+      }
       await this.fetchUserInfo()
     },
 
@@ -68,6 +71,7 @@ export const useUserStore = defineStore('user', {
       this.menus = []
       this.roles = []
       localStorage.removeItem('apeadmin_token')
+      localStorage.removeItem('apeadmin_refresh_token')
       resetRouter()
     },
   },

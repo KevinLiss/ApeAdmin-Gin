@@ -21,7 +21,13 @@
     "confirmDelete": "确定删除用户「{name}」吗？",
     "uploadAvatar": "上传头像",
     "usernameRequired": "请输入用户名",
-    "selectRole": "选择角色"
+    "selectRole": "选择角色",
+    "onlineUsers": "在线用户",
+    "lastActive": "最近活跃",
+    "kick": "踢下线",
+    "kicked": "已强制下线",
+    "confirmKick": "确定将用户「{name}」强制下线吗？其所有会话将立即失效。",
+    "onlineTip": "当前共 {n} 个活跃会话（15 分钟内有请求视为在线）"
   },
   "role": {
     "title": "角色管理",

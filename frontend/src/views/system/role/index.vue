@@ -12,7 +12,7 @@
       <el-button type="primary" @click="fetchData">
         <el-icon><Search /></el-icon>{{ t('common.actions.query') }}
       </el-button>
-      <el-button type="success" @click="openDialog()">
+      <el-button type="success" @click="openDialog()" v-permission="'system:role:add'">
         <el-icon><Plus /></el-icon>{{ t('common.actions.add') }}
       </el-button>
     </div>
@@ -35,9 +35,9 @@
       <el-table-column prop="remark" :label="t('system.role.remark')" min-width="150" show-overflow-tooltip />
       <el-table-column :label="t('common.actions.operation')" width="220" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openDialog(row)">{{ t('common.actions.edit') }}</el-button>
-          <el-button link type="warning" @click="openMenuDialog(row)">{{ t('system.role.assignMenus') }}</el-button>
-          <el-button link type="danger" @click="handleDelete(row)">{{ t('common.actions.delete') }}</el-button>
+          <el-button link type="primary" @click="openDialog(row)" v-permission="'system:role:edit'">{{ t('common.actions.edit') }}</el-button>
+          <el-button link type="warning" @click="openMenuDialog(row)" v-permission="'system:role:edit'">{{ t('system.role.assignMenus') }}</el-button>
+          <el-button link type="danger" @click="handleDelete(row)" v-permission="'system:role:delete'">{{ t('common.actions.delete') }}</el-button>
         </template>
       </el-table-column>
     </el-table>

@@ -25,8 +25,8 @@ func RequirePermission(permission string) gin.HandlerFunc {
 			return
 		}
 
-		// 收集用户权限集合
-		perms := service.GetUserPermissions(u.ID)
+		// 收集用户权限集合（TTL 缓存，角色变更时主动失效）
+		perms := service.GetUserPermissionsCached(u.ID)
 		if !perms[permission] && !perms["*"] {
 			c.AbortWithStatusJSON(http.StatusForbidden, response.ErrorCtx(c, 403, "perm.denied", map[string]string{"permission": permission}))
 			return

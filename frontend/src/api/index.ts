@@ -20,6 +20,8 @@ export const updateUser = (id: number, data: any) => request.put(`/users/${id}`,
 export const deleteUser = (id: number) => request.delete(`/users/${id}`)
 export const resetUserPassword = (id: number, newPassword: string) =>
   request.put(`/users/${id}/reset-password?new_password=${encodeURIComponent(newPassword)}`)
+export const getOnlineUsers = () => request.get('/users/online/list')
+export const kickUser = (id: number) => request.post(`/users/${id}/kick`)
 
 // ---- Roles ----
 export const getRoles = (params: any = {}) => request.get('/roles', { params })

@@ -20,6 +20,22 @@ var (
 	tbBuckets = make(map[string]*tokenBucket)
 )
 
+func init() {
+	// 后台 sweeper：定期清理不活跃的限流桶，防止按 IP 无限增长的内存泄漏
+	go func() {
+		for range time.Tick(10 * time.Minute) {
+			tbMu.Lock()
+			cutoff := time.Now().Add(-30 * time.Minute) // 30 分钟无活动的桶回收
+			for key, b := range tbBuckets {
+				if b.lastTime.Before(cutoff) {
+					delete(tbBuckets, key)
+				}
+			}
+			tbMu.Unlock()
+		}
+	}()
+}
+
 // RateLimit API 限流中间件（令牌桶，按 IP）
 // name: 限流标识；rpm: 每分钟请求数；window: 时间窗口
 func RateLimit(name string, rpm int, window time.Duration) gin.HandlerFunc {

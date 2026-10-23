@@ -58,6 +58,8 @@ func JWTAuth() gin.HandlerFunc {
 		c.Set("user_id", user.ID)
 		c.Set("username", user.Username)
 		c.Set("jti", claims.ID)
+		// 登记在线会话（在线用户列表 / 强制下线用）
+		core.TrackOnline(user.ID, user.Username, claims.ID, c.ClientIP(), c.GetHeader("User-Agent"))
 		c.Next()
 	}
 }
