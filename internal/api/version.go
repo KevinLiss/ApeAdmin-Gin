@@ -362,7 +362,11 @@ func doBackup(workDir, bakDir, exePath string, hasExe bool) error {
 	return nil
 }
 
-// replaceDir 用新目录替换旧目录（旧目录 rename 到 .backup-tmp 后删除，新目录 rename 过去）
+// replaceDir 用新目录替换旧目录。
+// 关键约束：srcDir（临时解包目录）与 dst 可能不在同一文件系统（Linux 上
+// /tmp 常为 tmpfs），跨设备 os.Rename 会报 EXDEV 失败。因此先 copyDir 到
+// dst 同目录下的 .new 临时目录，再用同文件系统内的三步 rename 完成原子换名：
+// dst -> .backup，.new -> dst，最后清理 .backup。
 func replaceDir(srcDir, dstRel string) error {
 	dst := dstRel
 	if !filepath.IsAbs(dst) {
@@ -371,16 +375,39 @@ func replaceDir(srcDir, dstRel string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 		return err
 	}
-	// 旧目录挪走（失败可忽略，rename 覆盖由 os.Rename 目录实现需要目标不存在）
+
+	// 1. 复制新目录到 dst 同侧（跨设备安全），确保后续 rename 均在同一文件系统
+	staged := dst + ".new"
+	_ = os.RemoveAll(staged)
+	if err := copyDir(srcDir, staged); err != nil {
+		_ = os.RemoveAll(staged)
+		return fmt.Errorf("暂存新目录失败: %w", err)
+	}
+
+	// 2. 旧目录挪到 .backup（同文件系统 rename）
 	if _, err := os.Stat(dst); err == nil {
 		old := dst + updateBackupSuffix
 		_ = os.RemoveAll(old)
 		if err := os.Rename(dst, old); err != nil {
+			_ = os.RemoveAll(staged)
 			return fmt.Errorf("无法挪走旧目录: %w", err)
 		}
-		defer os.RemoveAll(old)
+		// 换名失败时用 .backup 回滚
+		if err := os.Rename(staged, dst); err != nil {
+			_ = os.Rename(old, dst) // 回滚
+			_ = os.RemoveAll(staged)
+			return fmt.Errorf("新目录就位失败: %w", err)
+		}
+		_ = os.RemoveAll(old) // 成功后清理旧目录（另有 uploads/version-backup 完整备份）
+		return nil
 	}
-	return os.Rename(srcDir, dst)
+
+	// 首次部署（dst 不存在）直接就位
+	if err := os.Rename(staged, dst); err != nil {
+		_ = os.RemoveAll(staged)
+		return fmt.Errorf("新目录就位失败: %w", err)
+	}
+	return nil
 }
 
 // replaceBinary 按平台选择新二进制替换当前进程文件
