@@ -43,6 +43,7 @@ var allModels = []interface{}{
 	&model.SysAiProvider{},
 	&model.SysChatSession{},
 	&model.SysChatMessage{},
+	&model.SysChatRun{},
 	&model.SysLocale{},
 	&model.SysTranslation{},
 }
@@ -96,6 +97,11 @@ func Run(configPath string) error {
 
 	// 8.5 从数据库读运行时 admin_path 覆盖 config（系统设置里修改后台路径 + 重启后生效）
 	applyRuntimeAdminPath(cfg)
+
+	// 8.6 回收上次进程遗留的对话 run（worker 已不在内存，标记失败请用户重发）
+	if n := api.RecoverChatRuns(); n > 0 {
+		log.Printf("已回收 %d 个中断的 AI 对话 run", n)
+	}
 
 	// 9. 操作日志队列
 	auditQueue := core.NewAuditQueue(db, cfg.Log.OpLogQueueSize)
@@ -205,6 +211,8 @@ func runServer(r *gin.Engine, port int, deps *shutdownCtx) error {
 	if deps.auditQueue != nil {
 		deps.auditQueue.Shutdown(ctx2)
 	}
+	// 取消所有对话 run worker（限时等待，未写完的 run 下次启动时回收）
+	api.ShutdownChatRuns(3 * time.Second)
 	if deps.db != nil {
 		if sqlDB, err := deps.db.DB(); err == nil {
 			_ = sqlDB.Close()

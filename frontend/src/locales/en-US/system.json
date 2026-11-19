@@ -422,7 +422,14 @@
       "suggestDataStat": "Statistics",
       "suggestDataStatText": "Get system statistics",
       "suggestMenuTree": "Menu Tree",
-      "suggestMenuTreeText": "View the menu tree structure"
+      "suggestMenuTreeText": "View the menu tree structure",
+      "subtitle": "Query and operate the system in natural language. Multi-session parallel, no interruption on page switch",
+      "generatingCount": "{n} generating",
+      "renameSession": "Rename session",
+      "renamePrompt": "Enter a new session name",
+      "renameOk": "Session renamed",
+      "msgCount": "{n} msgs",
+      "newChat": "New chat"
     },
     "providers": {
       "title": "Model Key Management",

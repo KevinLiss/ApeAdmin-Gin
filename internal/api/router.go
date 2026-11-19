@@ -188,6 +188,13 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		ai.POST("/chat", middleware.RequirePermission("ai:chat"), aiH.Chat)
 		ai.POST("/chat/stream", middleware.RequirePermission("ai:chat"), aiH.ChatStream)
 
+		// AI 对话后台运行任务（qm 式 run 架构：多会话并行、切页面不中断）
+		ai.POST("/chat/runs", middleware.RequirePermission("ai:chat"), aiH.CreateChatRun)
+		ai.GET("/chat/runs/:id/events", middleware.RequirePermission("ai:chat"), aiH.ChatRunEvents)
+		ai.GET("/chat/runs/:id", middleware.RequirePermission("ai:chat"), aiH.GetChatRun)
+		ai.POST("/chat/runs/:id/stop", middleware.RequirePermission("ai:chat"), aiH.StopChatRun)
+		ai.GET("/chat/active-run", middleware.RequirePermission("ai:chat"), aiH.ActiveChatRun)
+
 		// AI 会话持久化
 		ai.GET("/sessions", middleware.RequirePermission("ai:chat"), aiH.ListSessions)
 		ai.POST("/sessions", middleware.RequirePermission("ai:chat"), aiH.CreateSession)

@@ -19,15 +19,39 @@
             :class="{ active: s.id === activeSessionId }"
             @click="switchSession(s.id)"
           >
-            <el-icon class="session-item-icon" :size="15"><ChatDotRound /></el-icon>
-            <span class="session-item-title" :title="s.title">{{ s.title }}</span>
-            <el-icon
-              class="session-item-del"
-              :size="14"
-              @click.stop="confirmDeleteSession(s)"
-            ><Delete /></el-icon>
+            <div class="session-item-row">
+              <el-icon class="session-item-icon" :size="15"><ChatDotRound /></el-icon>
+              <span class="session-item-title" :title="s.title">{{ s.title }}</span>
+              <span v-if="isSessionStreaming(s.id)" class="session-live-dot" :title="t('system.ai.chat.generatingCount', { n: 1 })"></span>
+              <el-icon
+                class="session-item-del"
+                :size="14"
+                @click.stop="confirmDeleteSession(s)"
+              ><Delete /></el-icon>
+            </div>
+            <div class="session-item-sub">
+              <span>{{ formatSessionTime(s.updated_at) }}</span>
+              <span class="session-item-count">{{ t('system.ai.chat.msgCount', { n: s.message_count }) }}</span>
+            </div>
           </div>
-          <div v-if="sessions.length === 0" class="session-empty">{{ t('system.ai.chat.noSessions') }}</div>
+          <!-- 未落库的进行中新对话（并行生成时可切回） -->
+          <div
+            v-for="tk in activeTempKeys"
+            :key="tk"
+            class="session-item"
+            :class="{ active: activeKey === tk }"
+            @click="switchToTemp(tk)"
+          >
+            <div class="session-item-row">
+              <el-icon class="session-item-icon" :size="15"><EditPen /></el-icon>
+              <span class="session-item-title">{{ t('system.ai.chat.newChat') }}</span>
+              <span v-if="isKeyStreaming(tk)" class="session-live-dot"></span>
+            </div>
+            <div class="session-item-sub">
+              <span>{{ t('system.ai.chat.generatingCount', { n: 1 }) }}</span>
+            </div>
+          </div>
+          <div v-if="sessions.length === 0 && activeTempKeys.length === 0" class="session-empty">{{ t('system.ai.chat.noSessions') }}</div>
         </div>
       </div>
     </transition>
@@ -40,56 +64,42 @@
 
     <!-- 主聊天区 -->
     <div class="chat-main">
-      <!-- 顶部工具栏 -->
+      <!-- 顶栏（轻量：仅会话名；供应商/模型已收纳进底部 composer） -->
       <div class="chat-header">
         <div class="chat-header-left">
           <button v-if="isMobile" class="icon-btn" @click="sessionDrawerOpen = true">
             <el-icon :size="18"><Menu /></el-icon>
           </button>
-          <span class="chat-title">{{ t('system.ai.chat.title') }}</span>
+          <el-icon v-if="streaming" class="header-live-spin" :size="14"><Loading /></el-icon>
+          <span class="chat-title">{{ activeTitle }}</span>
         </div>
         <div class="chat-header-right">
-          <!-- 供应商 + 模型 二级选择（替代原双标签 bug） -->
-          <el-select
-            v-model="selectedProviderId"
-            :placeholder="t('system.ai.chat.provider')"
-            class="provider-select"
-            size="default"
-            @change="onProviderChange"
-          >
-            <el-option
-              v-for="p in providers"
-              :key="p.id"
-              :label="p.name"
-              :value="p.id"
-            />
-          </el-select>
-          <el-select
-            v-model="selectedModel"
-            :placeholder="t('system.ai.chat.model')"
-            class="model-select"
-            size="default"
-            :disabled="modelOptions.length === 0"
-            @change="saveModelChoice"
-          >
-            <el-option v-for="m in modelOptions" :key="m" :label="m" :value="m" />
-          </el-select>
-          <el-tooltip :content="t('system.ai.chat.clearChat')" placement="bottom">
-            <button class="icon-btn" @click="clearChat">
-              <el-icon :size="16"><Delete /></el-icon>
-            </button>
-          </el-tooltip>
+          <button class="icon-btn" :title="t('system.ai.chat.renameSession')" @click="renameActiveSession">
+            <el-icon :size="16"><EditPen /></el-icon>
+          </button>
         </div>
       </div>
 
       <!-- 消息区域 -->
       <div ref="messagesRef" class="chat-messages" @scroll="handleScroll">
+        <!-- 其它会话生成中胶囊（多会话并行） -->
+        <div
+          v-if="backgroundGenerating.length > 0"
+          class="generating-pill"
+          @click="jumpToBackgroundSession"
+        >
+          <el-icon :size="12" class="pill-spin"><Loading /></el-icon>
+          <span>{{ t('system.ai.chat.generatingCount', { n: generatingCount }) }}</span>
+          <el-icon :size="12"><ArrowRight /></el-icon>
+        </div>
+
         <!-- 欢迎提示 -->
         <div v-if="messages.length === 0" class="chat-welcome">
           <div class="welcome-logo">
             <el-icon :size="30" color="#fff"><ChatDotRound /></el-icon>
           </div>
           <h3>{{ t('system.ai.chat.welcome') }}</h3>
+          <p class="welcome-subtitle">{{ t('system.ai.chat.subtitle') }}</p>
           <div class="welcome-suggestions">
             <div
               v-for="s in suggestions"
@@ -180,20 +190,50 @@
                   <el-switch v-model="enableTools" size="small" />
                 </div>
               </el-tooltip>
+              <el-tooltip :content="t('system.ai.chat.clearChat')" placement="top">
+                <button class="composer-icon-btn" @click="clearChat">
+                  <el-icon :size="15"><Delete /></el-icon>
+                </button>
+              </el-tooltip>
             </div>
             <div class="input-actions-right">
-              <span class="char-count" v-if="inputText.length">{{ inputText.length }}</span>
-              <el-button
+              <!-- 供应商 / 模型：无边框透明下拉（收纳进 composer） -->
+              <el-select
+                v-model="selectedProviderId"
+                :placeholder="t('system.ai.chat.provider')"
+                class="ghost-select provider-ghost"
+                size="small"
+                @change="onProviderChange"
+              >
+                <el-option
+                  v-for="p in providers"
+                  :key="p.id"
+                  :label="p.name"
+                  :value="p.id"
+                />
+              </el-select>
+              <el-select
+                v-model="selectedModel"
+                :placeholder="t('system.ai.chat.model')"
+                class="ghost-select model-ghost"
+                size="small"
+                :disabled="modelOptions.length === 0"
+                @change="saveModelChoice"
+              >
+                <el-option v-for="m in modelOptions" :key="m" :label="m" :value="m" />
+              </el-select>
+              <button
                 v-if="!streaming"
-                type="primary"
+                class="send-btn"
                 :disabled="!inputText.trim()"
+                :title="t('system.ai.chat.send')"
                 @click="sendMessage"
               >
-                <el-icon><Promotion /></el-icon><span class="send-label">{{ t('system.ai.chat.send') }}</span>
-              </el-button>
-              <el-button v-else type="danger" @click="stopStreaming">
-                <el-icon><VideoPause /></el-icon>{{ t('system.ai.chat.stop') }}
-              </el-button>
+                <el-icon :size="17"><Promotion /></el-icon>
+              </button>
+              <button v-else class="send-btn stop" :title="t('system.ai.chat.stop')" @click="stopStreaming">
+                <el-icon :size="15"><VideoPause /></el-icon>
+              </button>
             </div>
           </div>
         </div>
@@ -202,18 +242,76 @@
   </div>
 </template>
 
+<script lang="ts">
+// ─────────────────────────────────────────────────────────────────────────
+// 模块级会话流状态（跨组件实例保留）
+// 放在 setup 外部：切出「AI 全能助手」页面时组件销毁，但后台 run 订阅与
+// 视图状态继续存在，切回页面从同一 Map 恢复——「多会话并行、切页面不中断」。
+// key 规则：已落库会话 's{id}'；未落库新对话 't{n}'。
+// ─────────────────────────────────────────────────────────────────────────
+interface ToolEvent {
+  type: 'tool_call' | 'tool_result'
+  name: string
+  arguments?: any
+  result?: any
+}
+
+interface Message {
+  role: 'user' | 'assistant'
+  content: string
+  streaming?: boolean
+  error?: string
+  toolEvents?: ToolEvent[]
+}
+
+type RunStatus = 'pending' | 'running' | 'done' | 'failed' | 'stopped'
+
+/** 一条后台 run 的前端视图（SSE 订阅持有者） */
+interface LiveRun {
+  runId: number
+  sessionId: number | null
+  status: RunStatus
+  question: string
+  answer: string
+  toolEvents: ToolEvent[]
+  error: string | null
+  asstIdx: number // 对应 st.msgs 中 assistant 占位的下标
+  detach: (() => void) | null
+  reconnect: number
+}
+
+/** 单个会话/新对话的视图状态 */
+interface StreamState {
+  msgs: Message[]
+  run: LiveRun | null
+  queue: number[]
+  pendingRuns: Map<number, LiveRun>
+}
+
+const sessionStreams = new Map<string, StreamState>()
+let tempSeq = 0
+let lastActiveKey = '' // 记住最后活跃会话，切页/刷新回来恢复
+
+function isTerminalStatus(s: RunStatus | undefined): boolean {
+  return s === 'done' || s === 'failed' || s === 'stopped'
+}
+</script>
+
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getAllProviders,
-  chatStream,
   getChatSessions,
-  createChatSession,
   getChatSessionMessages,
+  renameChatSession,
   deleteChatSession,
-  appendChatMessage,
+  createChatRun,
+  getChatRun,
+  stopChatRun,
+  getActiveChatRun,
+  subscribeRunEvents,
 } from '@/api'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -234,44 +332,109 @@ import 'prismjs/components/prism-php.min.js'
 import 'prismjs/components/prism-markdown.min.js'
 import 'prismjs/components/prism-ini.min.js'
 
-interface ToolEvent {
-  type: 'tool_call' | 'tool_result'
-  name: string
-  arguments?: any
-  result?: any
-}
-
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-  streaming?: boolean
-  error?: string
-  toolEvents?: ToolEvent[]
-}
-
 interface ChatSessionItem {
   id: number
   title: string
   message_count: number
-  updated_at: string
+  updated_at: string | null
 }
 
 const messagesRef = ref<HTMLElement>()
 const { t } = useI18n()
 const inputText = ref('')
-const streaming = ref(false)
 const enableTools = ref(true)
 const providers = ref<any[]>([])
 const selectedProviderId = ref<number | null>(null)
 const selectedModel = ref<string>('')
-const messages = ref<Message[]>([])
+
 const sessions = ref<ChatSessionItem[]>([])
 const activeSessionId = ref<number | null>(null)
+// 当前未落库新对话的临时 key（null = 无临时对话）
+const activeTempKey = ref<string | null>(null)
+
 const sessionDrawerOpen = ref(false)
 const isMobile = ref(window.innerWidth <= 991)
-let abortController: AbortController | null = null
 
 const STORAGE_KEY = 'apeadmin_ai_chat_pref'
+
+// ─── 会话流状态桥接（模块级 Map ↔ 响应式视图） ───
+// Map 本身非响应式：用版本号驱动视图刷新
+const streamVersion = ref(0)
+function touchStream() {
+  streamVersion.value++
+}
+
+/** 当前视图使用的流 key */
+const activeKey = computed(() => {
+  if (activeSessionId.value) return 's' + activeSessionId.value
+  return activeTempKey.value || ''
+})
+
+/** 当前会话消息（无状态则空数组展示欢迎页） */
+const messages = computed(() => {
+  void streamVersion.value // 依赖版本号触发刷新
+  return sessionStreams.get(activeKey.value)?.msgs ?? []
+})
+
+/** 当前会话是否生成中 */
+const streaming = computed(() => {
+  void streamVersion.value
+  const run = sessionStreams.get(activeKey.value)?.run
+  return !!run && !isTerminalStatus(run.status)
+})
+
+/** 生成中的会话总数 */
+const generatingCount = computed(() => {
+  void streamVersion.value
+  let n = 0
+  sessionStreams.forEach((st) => {
+    if (st.run && !isTerminalStatus(st.run.status)) n++
+  })
+  return n
+})
+
+/** 非当前视图的生成中 key（胶囊点击目标） */
+const backgroundGenerating = computed(() => {
+  void streamVersion.value
+  const keys: string[] = []
+  sessionStreams.forEach((st, k) => {
+    if (st.run && !isTerminalStatus(st.run.status) && k !== activeKey.value) keys.push(k)
+  })
+  return keys
+})
+
+/** 侧栏里展示的、非当前视图的新对话（未落库/生成中） */
+const activeTempKeys = computed(() => {
+  void streamVersion.value
+  const keys: string[] = []
+  sessionStreams.forEach((st, k) => {
+    if (k.startsWith('t') && k !== activeKey.value && st.msgs.length > 0) keys.push(k)
+  })
+  return keys
+})
+
+/** 顶栏标题：当前会话名 */
+const activeTitle = computed(() => {
+  if (activeSessionId.value) {
+    const s = sessions.value.find((x) => x.id === activeSessionId.value)
+    if (s) return s.title
+    return t('system.ai.chat.title')
+  }
+  const st = activeTempKey.value ? sessionStreams.get(activeTempKey.value) : null
+  if (st && st.msgs.length) return t('system.ai.chat.newChat')
+  return t('system.ai.chat.title')
+})
+
+function isSessionStreaming(id: number): boolean {
+  void streamVersion.value
+  const run = sessionStreams.get('s' + id)?.run
+  return !!run && !isTerminalStatus(run.status)
+}
+function isKeyStreaming(key: string): boolean {
+  void streamVersion.value
+  const run = sessionStreams.get(key)?.run
+  return !!run && !isTerminalStatus(run.status)
+}
 
 const currentProvider = computed(() =>
   providers.value.find((p) => p.id === selectedProviderId.value)
@@ -392,7 +555,7 @@ function onProviderChange() {
   saveModelChoice()
 }
 
-// ---------- 会话管理 ----------
+// ---------- 会话列表 ----------
 async function loadSessions() {
   try {
     const data: any = await getChatSessions()
@@ -402,43 +565,140 @@ async function loadSessions() {
   }
 }
 
-async function newSession() {
-  messages.value = []
-  activeSessionId.value = null
-  sessionDrawerOpen.value = false
+function upsertSessionItem(item: ChatSessionItem) {
+  const idx = sessions.value.findIndex((s) => s.id === item.id)
+  if (idx >= 0) sessions.value.splice(idx, 1, { ...sessions.value[idx], ...item })
+  else sessions.value.unshift(item)
 }
 
-async function ensureSession(): Promise<number | null> {
-  if (activeSessionId.value) return activeSessionId.value
-  try {
-    const data: any = await createChatSession()
-    const s = data
-    activeSessionId.value = s.id
-    sessions.value.unshift({ id: s.id, title: s.title, message_count: 0, updated_at: s.updated_at })
-    return s.id
-  } catch {
-    return null // 会话保存失败不阻塞对话
+// ---------- 视图状态操作 ----------
+function ensureState(key: string): StreamState {
+  let st = sessionStreams.get(key)
+  if (!st) {
+    st = { msgs: [], run: null, queue: [], pendingRuns: new Map() }
+    sessionStreams.set(key, st)
+  }
+  return st
+}
+
+function isActiveState(st: StreamState): boolean {
+  return sessionStreams.get(activeKey.value) === st
+}
+
+function newSession() {
+  // 当前已是空白新对话则复用
+  const cur = activeTempKey.value ? sessionStreams.get(activeTempKey.value) : null
+  if (!activeSessionId.value && cur && cur.msgs.length === 0 && !cur.run) {
+    sessionDrawerOpen.value = false
+    return
+  }
+  const key = 't' + ++tempSeq
+  sessionStreams.set(key, { msgs: [], run: null, queue: [], pendingRuns: new Map() })
+  activeSessionId.value = null
+  activeTempKey.value = key
+  lastActiveKey = key
+  sessionDrawerOpen.value = false
+  touchStream()
+}
+
+/** 切到某个新对话视图（并行生成时可切回） */
+function switchToTemp(key: string) {
+  activeSessionId.value = null
+  activeTempKey.value = key
+  lastActiveKey = key
+  sessionDrawerOpen.value = false
+  touchStream()
+  scrollToBottom(true)
+}
+
+/** 跳到最近一个后台生成中的会话 */
+function jumpToBackgroundSession() {
+  const key = backgroundGenerating.value[0]
+  if (!key) return
+  if (key.startsWith('s')) {
+    activeSessionId.value = Number(key.slice(1))
+    activeTempKey.value = null
+    lastActiveKey = key
+    touchStream()
+    scrollToBottom(true)
+  } else {
+    switchToTemp(key)
   }
 }
 
 async function switchSession(id: number) {
-  if (streaming.value) {
-    ElMessage.warning(t('system.ai.chat.streaming'))
+  if (activeSessionId.value === id && !activeTempKey.value) return
+  activeSessionId.value = id
+  activeTempKey.value = null
+  const key = 's' + id
+  lastActiveKey = key
+  sessionDrawerOpen.value = false
+
+  const st = sessionStreams.get(key)
+  // 有活跃 run：直接看内存中的实时状态（切页返回场景）
+  if (st?.run && !isTerminalStatus(st.run.status)) {
+    touchStream()
+    scrollToBottom(true)
     return
   }
-  activeSessionId.value = id
-  sessionDrawerOpen.value = false
   try {
     const data: any = await getChatSessionMessages(id)
+    if (activeSessionId.value !== id) return // 期间又切走了
     const list = data?.messages || []
-    messages.value = list.map((m: any) => ({
+    const state = ensureState(key)
+    state.msgs = list.map((m: any) => ({
       role: m.role,
       content: m.content,
       toolEvents: m.tool_events || [],
     }))
-    scrollToBottom()
+    state.run = null
+    state.queue = []
+    state.pendingRuns.clear()
+    touchStream()
+    scrollToBottom(true)
+    // 恢复后台仍在进行的 run（刷新浏览器/其他页面发起）
+    await restoreSession(id)
   } catch {
     ElMessage.error(t('system.ai.chat.loadFailed'))
+  }
+}
+
+/** 进入会话时恢复运行中的 run（刷新页面/重开浏览器后也能续上） */
+async function restoreSession(id: number) {
+  const key = 's' + id
+  const st = sessionStreams.get(key)
+  if (!st) return false
+  if (st.run && !isTerminalStatus(st.run.status)) return true
+  try {
+    const data: any = await getActiveChatRun(id)
+    if (!data || !data.run_id) return false
+    // 历史里已有本轮提问（入队即落库），补一个 assistant 占位承接流式内容
+    st.msgs.push({
+      role: 'assistant',
+      content: data.answer || '',
+      streaming: true,
+      toolEvents: data.tool_events || [],
+    })
+    const run: LiveRun = {
+      runId: data.run_id,
+      sessionId: id,
+      status: data.status,
+      question: data.question || '',
+      answer: data.answer || '',
+      toolEvents: data.tool_events || [],
+      error: data.error || null,
+      asstIdx: st.msgs.length - 1,
+      detach: null,
+      reconnect: 0,
+    }
+    // 排队的 run id 跨刷新不可知（后端执行后自然出现），此处清空
+    if (data.queued > 0) st.queue = []
+    st.run = run
+    attach(st, run)
+    touchStream()
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -449,35 +709,73 @@ async function confirmDeleteSession(s: ChatSessionItem) {
       cancelButtonText: t('common.actions.cancel'),
       type: 'warning',
     })
+    const key = 's' + s.id
+    const st = sessionStreams.get(key)
+    // 先停掉该会话的活跃/排队 run，再删库
+    if (st) {
+      if (st.run && !isTerminalStatus(st.run.status)) {
+        try {
+          await stopChatRun(st.run.runId)
+        } catch {
+          /* ignore */
+        }
+      }
+      st.run?.detach?.()
+      for (const qid of st.queue) {
+        try {
+          await stopChatRun(qid)
+        } catch {
+          /* ignore */
+        }
+      }
+      sessionStreams.delete(key)
+    }
     await deleteChatSession(s.id)
     sessions.value = sessions.value.filter((x) => x.id !== s.id)
     if (activeSessionId.value === s.id) {
       activeSessionId.value = null
-      messages.value = []
+      activeTempKey.value = null
+      lastActiveKey = ''
+      newSession()
     }
+    touchStream()
     ElMessage.success(t('system.ai.chat.sessionDeleted'))
   } catch {
     /* 用户取消 */
   }
 }
 
-async function persistMessage(role: 'user' | 'assistant', content: string, toolEvents?: ToolEvent[]) {
-  const sid = await ensureSession()
-  if (!sid) return
+async function renameActiveSession() {
+  const sid = activeSessionId.value
+  if (!sid) {
+    ElMessage.info(t('system.ai.chat.renamePrompt'))
+    return
+  }
+  const cur = sessions.value.find((x) => x.id === sid)
   try {
-    await appendChatMessage(sid, { role, content, tool_events: toolEvents || null })
-    // 更新侧栏标题/计数
-    const s = sessions.value.find((x) => x.id === sid)
-    if (s) {
-      s.message_count += 1
-      if (role === 'user' && s.title === t('system.ai.chat.newChatTitle')) s.title = content.slice(0, 50)
-    }
+    const res = await ElMessageBox.prompt(
+      t('system.ai.chat.renamePrompt'),
+      t('system.ai.chat.renameSession'),
+      {
+        confirmButtonText: t('common.actions.confirm'),
+        cancelButtonText: t('common.actions.cancel'),
+        inputValue: cur?.title || '',
+        inputValidator: (v: string) => (!!v && !!v.trim()) || t('system.ai.chat.renamePrompt'),
+      }
+    )
+    const title = (res.value || '').trim()
+    if (!title) return
+    await renameChatSession(sid, title)
+    if (cur) cur.title = title
+    touchStream()
+    ElMessage.success(t('system.ai.chat.renameOk'))
   } catch {
-    /* 保存失败不阻塞对话 */
+    /* 用户取消 */
   }
 }
 
 // ---------- 滚动 ----------
+let autoScroll = true
 function scrollToBottom(force = false) {
   nextTick(() => {
     if (!messagesRef.value) return
@@ -487,12 +785,130 @@ function scrollToBottom(force = false) {
   })
 }
 
-let autoScroll = true
 function handleScroll() {
   const el = messagesRef.value
   if (!el) return
   // 距底部 80px 内视为跟随滚动
   autoScroll = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+}
+
+// ---------- run 订阅 ----------
+/** 建立/重建 SSE 订阅（seen=0 时以服务端快照为基线，不会重复） */
+function attach(st: StreamState, run: LiveRun, seen = 0) {
+  run.detach?.()
+  run.detach = subscribeRunEvents(
+    run.runId,
+    seen,
+    (ev: any) => {
+      run.reconnect = 0
+      if (ev.type === 'snapshot') {
+        run.status = ev.status
+        run.answer = ev.answer || ''
+        run.toolEvents = ev.tool_events || []
+        run.error = ev.error || null
+      } else if (ev.type === 'run_start') {
+        run.status = 'running'
+      } else if (ev.type === 'content') {
+        run.answer += ev.content || ''
+      } else if (ev.type === 'tool_call') {
+        run.toolEvents.push({ type: 'tool_call', name: ev.name, arguments: ev.arguments })
+      } else if (ev.type === 'tool_result') {
+        run.toolEvents.push({ type: 'tool_result', name: ev.name, result: ev.result })
+      } else if (ev.type === 'run_end') {
+        run.status = ev.status
+        run.error = ev.error || null
+      } else if (ev.type === 'error') {
+        run.status = 'failed'
+        run.error = ev.message || t('system.ai.chat.requestFailed')
+      }
+      syncRunMessage(st, run)
+      touchStream()
+      if (isActiveState(st)) scrollToBottom()
+    },
+    () => onRunClosed(st, run),
+    (msg: string) => onRunError(st, run, msg)
+  )
+  syncRunMessage(st, run)
+}
+
+/** 把 run 状态同步到消息列表中的 assistant 占位 */
+function syncRunMessage(st: StreamState, run: LiveRun) {
+  const msg = st.msgs[run.asstIdx]
+  if (!msg) return
+  msg.content = run.answer
+  msg.toolEvents = run.toolEvents
+  msg.streaming = !isTerminalStatus(run.status)
+  msg.error = run.error || undefined
+}
+
+function onRunClosed(st: StreamState, run: LiveRun) {
+  if (isTerminalStatus(run.status)) {
+    finishRun(st, run)
+    return
+  }
+  if (run.reconnect < 3) {
+    reconnectRun(st, run)
+    return
+  }
+  // 多次重连失败：降级为一次性查询
+  getChatRun(run.runId)
+    .then((d: any) => {
+      run.status = d.status
+      run.answer = d.answer ?? ''
+      run.toolEvents = d.tool_events ?? []
+      run.error = d.error || run.error
+    })
+    .catch(() => {
+      run.status = 'failed'
+      run.error = run.error || t('system.ai.chat.requestFailed')
+    })
+    .finally(() => {
+      syncRunMessage(st, run)
+      touchStream()
+      finishRun(st, run)
+    })
+}
+
+function reconnectRun(st: StreamState, run: LiveRun) {
+  run.reconnect += 1
+  const delay = Math.min(1000 * 2 ** (run.reconnect - 1), 4000)
+  setTimeout(() => {
+    if (!isTerminalStatus(run.status)) attach(st, run, 0)
+  }, delay)
+}
+
+function onRunError(st: StreamState, run: LiveRun, message: string) {
+  if (run.reconnect < 3) {
+    reconnectRun(st, run)
+    return
+  }
+  run.status = 'failed'
+  run.error = run.error || message
+  syncRunMessage(st, run)
+  touchStream()
+  finishRun(st, run)
+}
+
+/** run 终态：收尾 + 接管同会话排队中的下一条 */
+function finishRun(st: StreamState, run: LiveRun) {
+  syncRunMessage(st, run)
+  run.detach?.()
+  run.detach = null
+  touchStream()
+  loadSessions()
+  while (st.queue.length > 0) {
+    const nextId = st.queue.shift()!
+    const next = st.pendingRuns.get(nextId)
+    st.pendingRuns.delete(nextId)
+    if (next && !isTerminalStatus(next.status)) {
+      st.run = next
+      attach(st, next)
+      touchStream()
+      return
+    }
+  }
+  st.run = null
+  touchStream()
 }
 
 // ---------- 发送 ----------
@@ -501,100 +917,109 @@ function sendQuickMessage(text: string) {
   sendMessage()
 }
 
-function buildMessagesForApi(): Array<{ role: string; content: string }> {
-  return messages.value
-    .filter((m) => m.content || m.role === 'user')
-    .map((m) => ({ role: m.role, content: m.content || '' }))
-}
-
 async function sendMessage() {
   const text = inputText.value.trim()
-  if (!text || streaming.value) return
-
+  if (!text) return
   if (providers.value.length === 0) {
     ElMessage.warning(t('system.ai.chat.providerRequired'))
     return
   }
-
-  messages.value.push({ role: 'user', content: text })
-  inputText.value = ''
-
-  const assistantMsg: Message = {
-    role: 'assistant',
-    content: '',
-    streaming: true,
-    toolEvents: [],
+  // 确保当前视图有状态容器
+  if (!activeKey.value) {
+    const tk = 't' + ++tempSeq
+    sessionStreams.set(tk, { msgs: [], run: null, queue: [], pendingRuns: new Map() })
+    activeTempKey.value = tk
+    lastActiveKey = tk
   }
-  messages.value.push(assistantMsg)
+  const key = activeKey.value
+  const st = ensureState(key)
+  const sessionIdAtSend = activeSessionId.value
 
-  streaming.value = true
+  st.msgs.push({ role: 'user', content: text })
+  st.msgs.push({ role: 'assistant', content: '', streaming: true, toolEvents: [] })
+  const asstIdx = st.msgs.length - 1
+  inputText.value = ''
   autoScroll = true
+  touchStream()
   scrollToBottom(true)
 
-  // 异步持久化用户消息
-  persistMessage('user', text)
+  try {
+    const data: any = await createChatRun({
+      session_id: sessionIdAtSend,
+      question: text,
+      provider_id: selectedProviderId.value,
+      model: selectedModel.value || null,
+      enable_tools: enableTools.value,
+    })
+    const runId: number = data.run_id
+    const sessionId: number = data.session_id
 
-  const apiMessages = buildMessagesForApi()
-  if (apiMessages.length > 0 && apiMessages[apiMessages.length - 1].role === 'assistant' && !apiMessages[apiMessages.length - 1].content) {
-    apiMessages.pop()
-  }
-
-  const reqBody: any = {
-    messages: apiMessages,
-    enable_tools: enableTools.value,
-  }
-  if (selectedProviderId.value) {
-    reqBody.provider_id = selectedProviderId.value
-  }
-  if (selectedModel.value) {
-    reqBody.model = selectedModel.value
-  }
-
-  abortController = chatStream(reqBody, (event: any) => {
-    if (event.type === 'content') {
-      assistantMsg.content += event.content
-      scrollToBottom()
-    } else if (event.type === 'tool_call') {
-      assistantMsg.toolEvents!.push({
-        type: 'tool_call',
-        name: event.name,
-        arguments: event.arguments,
+    // 新对话已落库：视图 key 迁移 t{n} → s{id}，侧栏即时展示
+    if (sessionIdAtSend === null) {
+      const newKey = 's' + sessionId
+      sessionStreams.delete(key)
+      sessionStreams.set(newKey, st)
+      if (activeTempKey.value === key) {
+        activeTempKey.value = null
+        activeSessionId.value = sessionId
+      }
+      if (lastActiveKey === key) lastActiveKey = newKey
+      upsertSessionItem({
+        id: sessionId,
+        title: data.title || t('system.ai.chat.newChatTitle'),
+        message_count: 0,
+        updated_at: new Date().toISOString(),
       })
-      scrollToBottom()
-    } else if (event.type === 'tool_result') {
-      assistantMsg.toolEvents!.push({
-        type: 'tool_result',
-        name: event.name,
-        result: event.result,
-      })
-      scrollToBottom()
-    } else if (event.type === 'done') {
-      assistantMsg.streaming = false
-      streaming.value = false
-      scrollToBottom()
-      persistMessage('assistant', assistantMsg.content, assistantMsg.toolEvents)
-    } else if (event.type === 'error') {
-      assistantMsg.streaming = false
-      assistantMsg.error = event.message || t('system.ai.chat.requestFailed')
-      streaming.value = false
     }
-  })
+
+    const run: LiveRun = {
+      runId,
+      sessionId,
+      status: 'pending',
+      question: text,
+      answer: '',
+      toolEvents: [],
+      error: null,
+      asstIdx,
+      detach: null,
+      reconnect: 0,
+    }
+    if (st.run && !isTerminalStatus(st.run.status)) {
+      // 同会话已有活跃 run：后端 FIFO 排队，当前 run 结束后自动接管
+      st.pendingRuns.set(runId, run)
+      st.queue.push(runId)
+    } else {
+      st.run = run
+      attach(st, run)
+    }
+    touchStream()
+    scrollToBottom()
+  } catch (e: any) {
+    const msg = st.msgs[asstIdx]
+    if (msg) {
+      msg.streaming = false
+      msg.error = e?.message || t('system.ai.chat.requestFailed')
+    }
+    touchStream()
+    ElMessage.error(e?.message || t('system.ai.chat.requestFailed'))
+  }
 }
 
-function stopStreaming() {
-  if (abortController) {
-    abortController.abort()
-    abortController = null
+async function stopStreaming() {
+  const st = sessionStreams.get(activeKey.value)
+  const run = st?.run
+  if (!st || !run || isTerminalStatus(run.status)) return
+  try {
+    await stopChatRun(run.runId)
+  } catch {
+    /* 忽略：仍以服务端事件为准 */
   }
-  streaming.value = false
-  const last = messages.value[messages.value.length - 1]
-  if (last && last.streaming) {
-    last.streaming = false
-    if (!last.content) {
-      last.content = t('system.ai.chat.stopped')
-    } else {
-      persistMessage('assistant', last.content, last.toolEvents)
-    }
+  // 无订阅（断网等）时本地兜底收尾
+  if (!run.detach) {
+    run.status = 'stopped'
+    syncRunMessage(st, run)
+    touchStream()
+    finishRun(st, run)
   }
 }
 
@@ -606,13 +1031,31 @@ function clearChat() {
     type: 'warning',
   })
     .then(() => {
-      messages.value = []
+      // 仅切换视图（历史仍在会话列表中，可随时切回）
       activeSessionId.value = null
+      activeTempKey.value = null
+      lastActiveKey = ''
+      newSession()
     })
     .catch(() => {})
 }
 
-// ---------- 复制 ----------
+// ---------- 辅助 ----------
+function formatSessionTime(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  if (d.toDateString() === now.toDateString()) {
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  if (d.getFullYear() === now.getFullYear()) {
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  }
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 async function copyMessage(msg: Message) {
   try {
     await navigator.clipboard.writeText(msg.content)
@@ -622,7 +1065,6 @@ async function copyMessage(msg: Message) {
   }
 }
 
-// ---------- 移动端检测 ----------
 function onResize() {
   isMobile.value = window.innerWidth <= 991
 }
@@ -630,12 +1072,31 @@ function onResize() {
 onMounted(() => {
   window.addEventListener('resize', onResize)
   loadProviders()
-  loadSessions()
+  loadSessions().then(() => {
+    // 清理滞留的终态 run（历史中已有最终内容）
+    sessionStreams.forEach((st) => {
+      if (st.run && isTerminalStatus(st.run.status)) {
+        st.run.detach?.()
+        st.run = null
+      }
+    })
+    // 恢复上次停留的会话（组件切回/刷新后）
+    if (lastActiveKey.startsWith('s')) {
+      const id = Number(lastActiveKey.slice(1))
+      if (sessions.value.some((s) => s.id === id)) {
+        switchSession(id)
+      }
+    } else if (lastActiveKey.startsWith('t') && sessionStreams.has(lastActiveKey)) {
+      activeSessionId.value = null
+      activeTempKey.value = lastActiveKey
+      touchStream()
+    }
+  })
 })
 
 onBeforeUnmount(() => {
+  // 只解绑 DOM 监听；后台 run 订阅挂在模块级 Map 上，切页面不中断
   window.removeEventListener('resize', onResize)
-  if (abortController) abortController.abort()
 })
 </script>
 
@@ -684,14 +1145,46 @@ onBeforeUnmount(() => {
 }
 .session-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
   color: var(--text-regular, #606266);
   font-size: 13px;
   transition: background 0.15s;
+}
+.session-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.session-item-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 23px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--text-secondary, #909399);
+}
+.session-item-count {
+  flex-shrink: 0;
+}
+.session-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  animation: live-breathe 1.4s ease-in-out infinite;
+}
+@keyframes live-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
 }
 .session-item:hover {
   background: var(--fill-hover, #f5f7fa);
@@ -772,11 +1265,12 @@ onBeforeUnmount(() => {
   gap: 8px;
   flex-shrink: 0;
 }
-.provider-select {
-  width: 150px;
+.header-live-spin {
+  color: var(--el-color-primary, #5a67f5);
+  animation: spin 1s linear infinite;
 }
-.model-select {
-  width: 180px;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 .icon-btn {
   display: inline-flex;
@@ -811,6 +1305,34 @@ onBeforeUnmount(() => {
   border-radius: 3px;
 }
 
+/* 生成中胶囊（多会话并行时提示后台生成） */
+.generating-pill {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin: 0 auto 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--el-color-primary-light-9, #ecf0ff);
+  color: var(--el-color-primary, #5a67f5);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(90, 103, 245, 0.12);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.generating-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(90, 103, 245, 0.2);
+}
+.pill-spin {
+  animation: spin 1s linear infinite;
+}
+
 /* Welcome */
 .chat-welcome {
   display: flex;
@@ -832,9 +1354,14 @@ onBeforeUnmount(() => {
   box-shadow: 0 8px 20px rgba(90, 103, 245, 0.25);
 }
 .chat-welcome h3 {
-  margin: 16px 0 20px;
+  margin: 16px 0 6px;
   font-size: 19px;
   color: var(--text-primary, #303133);
+}
+.welcome-subtitle {
+  margin: 0 0 22px;
+  font-size: 13px;
+  color: var(--text-secondary, #909399);
 }
 .welcome-suggestions {
   display: grid;
@@ -1148,6 +1675,7 @@ onBeforeUnmount(() => {
 .input-actions-left {
   display: flex;
   align-items: center;
+  gap: 2px;
 }
 .tools-toggle {
   display: flex;
@@ -1160,11 +1688,78 @@ onBeforeUnmount(() => {
 .input-actions-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
-.char-count {
+/* 透明无边框下拉（供应商/模型收纳进 composer） */
+.ghost-select {
+  width: auto;
+}
+.provider-ghost {
+  max-width: 150px;
+}
+.model-ghost {
+  max-width: 170px;
+}
+.ghost-select :deep(.el-select__wrapper) {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  padding: 0 6px;
+  min-height: 26px;
+}
+.ghost-select :deep(.el-select__wrapper:hover) {
+  background: var(--fill-hover, #f5f7fa);
+}
+.ghost-select :deep(.el-select__selected-item) {
   font-size: 12px;
   color: var(--text-secondary, #909399);
+}
+/* composer 图标按钮（清空） */
+.composer-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #909399);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.composer-icon-btn:hover {
+  background: var(--fill-hover, #f5f7fa);
+  color: var(--el-color-danger, #f56c6c);
+}
+/* 圆形发送/停止按钮 */
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--el-color-primary, #5a67f5), #47d8ff);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  box-shadow: 0 2px 8px rgba(90, 103, 245, 0.25);
+}
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(90, 103, 245, 0.35);
+}
+.send-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.send-btn.stop {
+  background: linear-gradient(135deg, #f56c6c, #f89898);
+  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.25);
 }
 
 /* ========== 移动端适配（≤991px） ========== */
@@ -1182,11 +1777,11 @@ onBeforeUnmount(() => {
     box-shadow: 4px 0 16px rgba(0, 0, 0, 0.08);
     transform: translateX(0);
   }
-  .provider-select {
-    width: 118px;
+  .provider-ghost {
+    max-width: 96px;
   }
-  .model-select {
-    width: 128px;
+  .model-ghost {
+    max-width: 112px;
   }
   .chat-messages {
     padding: 14px;
@@ -1210,9 +1805,6 @@ onBeforeUnmount(() => {
   }
   .chat-input-area {
     padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
-  }
-  .send-label {
-    display: none;
   }
 }
 
@@ -1316,5 +1908,21 @@ html.dark .chat-input-area .el-textarea__inner::placeholder {
 html.dark .msg-action-btn:hover {
   background: rgba(127, 138, 248, 0.1);
   color: #7f8af8;
+}
+html.dark .session-item-sub {
+  color: #6b7089;
+}
+html.dark .generating-pill {
+  background: rgba(127, 138, 248, 0.15);
+  color: #9aa3ff;
+}
+html.dark .ghost-select .el-select__wrapper:hover {
+  background: rgba(127, 138, 248, 0.1);
+}
+html.dark .ghost-select .el-select__selected-item {
+  color: #9aa0b5;
+}
+html.dark .composer-icon-btn:hover {
+  background: rgba(127, 138, 248, 0.1);
 }
 </style>

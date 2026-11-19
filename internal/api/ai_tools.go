@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -127,7 +128,8 @@ func getCurrentUserPerms(c *gin.Context) map[string]bool {
 }
 
 // streamLLMRequest 发起流式 LLM 请求，返回响应体（调用方负责 Close）
-func streamLLMRequest(llmMessages []map[string]interface{}, baseURL, apiKey, model string, tools []map[string]interface{}) (*http.Response, error) {
+// ctx 用于请求生命周期控制：页面断开/服务停机时取消上游流
+func streamLLMRequest(ctx context.Context, llmMessages []map[string]interface{}, baseURL, apiKey, model string, tools []map[string]interface{}) (*http.Response, error) {
 	body := map[string]interface{}{
 		"model":       model,
 		"messages":    llmMessages,
@@ -141,7 +143,7 @@ func streamLLMRequest(llmMessages []map[string]interface{}, baseURL, apiKey, mod
 	}
 	payload, _ := json.Marshal(body)
 	url := strings.TrimRight(baseURL, "/") + "/chat/completions"
-	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(string(payload)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(string(payload)))
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +166,14 @@ func streamLLMRequest(llmMessages []map[string]interface{}, baseURL, apiKey, mod
 	return resp, nil
 }
 
+// toolAuditIdentity 工具调用审计身份（让后台 run 执行器无需 gin.Context 也能审计）
+type toolAuditIdentity struct {
+	UserID   uint
+	Username string
+}
+
 // executeAITool 执行 AI 工具（带权限校验），返回 JSON 字符串
-func executeAITool(toolName string, args interface{}, userPerms map[string]bool, c *gin.Context) string {
+func executeAITool(toolName string, args interface{}, userPerms map[string]bool, audit *toolAuditIdentity) string {
 	// 权限校验
 	required := aiToolPermissions[toolName]
 	allowed := false
@@ -239,12 +247,10 @@ func executeAITool(toolName string, args interface{}, userPerms map[string]bool,
 					return toJSON(map[string]string{"error": err.Error()})
 				}
 				// 写审计日志
-				if c != nil {
-					userID := c.GetUint("user_id")
-					username := c.GetString("username")
+				if audit != nil && audit.UserID > 0 {
 					argsJSON, _ := json.Marshal(argsMap)
 					resultJSON, _ := json.Marshal(result)
-					mgr.WriteAuditLog(userID, username, "tool", toolName, string(argsJSON), string(resultJSON), "success", 0)
+					mgr.WriteAuditLog(audit.UserID, audit.Username, "tool", toolName, string(argsJSON), string(resultJSON), "success", 0)
 				}
 				return toJSON(result)
 			}

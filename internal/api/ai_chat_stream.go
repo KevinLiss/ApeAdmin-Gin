@@ -297,6 +297,7 @@ func chatNonStreamOnce(provider *model.SysAiProvider, model string, messages []m
 	}
 	llmMessages, tools := buildLLMMessages(messages, enableTools)
 	userPerms := getCurrentUserPerms(c)
+	audit := &toolAuditIdentity{UserID: c.GetUint("user_id"), Username: c.GetString("username")}
 	for round := 0; round < 5; round++ {
 		resp, err := callLLMOnce(llmMessages, baseURL, apiKey, modelName, tools)
 		if err != nil {
@@ -316,7 +317,7 @@ func chatNonStreamOnce(provider *model.SysAiProvider, model string, messages []m
 			fnName := getString(getMap(tc, "function"), "name")
 			fnArgs := getMap(getMap(tc, "function"), "arguments")
 			argsJSON, _ := json.Marshal(fnArgs)
-			result := executeAITool(fnName, string(argsJSON), userPerms, c)
+			result := executeAITool(fnName, string(argsJSON), userPerms, audit)
 			llmMessages = append(llmMessages, map[string]interface{}{
 				"role":         "tool",
 				"tool_call_id": getString(tc, "id"),
@@ -345,6 +346,7 @@ func streamChat(c *gin.Context, provider *model.SysAiProvider, model string, mes
 	}
 	llmMessages, tools := buildLLMMessages(messages, enableTools)
 	userPerms := getCurrentUserPerms(c)
+	audit := &toolAuditIdentity{UserID: c.GetUint("user_id"), Username: c.GetString("username")}
 
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
@@ -368,7 +370,7 @@ func streamChat(c *gin.Context, provider *model.SysAiProvider, model string, mes
 		hasToolCalls := false
 
 		// 流式请求 LLM
-		resp, err := streamLLMRequest(llmMessages, baseURL, apiKey, modelName, tools)
+		resp, err := streamLLMRequest(c.Request.Context(), llmMessages, baseURL, apiKey, modelName, tools)
 		if err != nil {
 			sendEvent(map[string]string{"type": "error", "message": err.Error()})
 			return
@@ -464,7 +466,7 @@ func streamChat(c *gin.Context, provider *model.SysAiProvider, model string, mes
 				args = map[string]interface{}{}
 			}
 			sendEvent(map[string]interface{}{"type": "tool_call", "name": fnName, "arguments": args})
-			result := executeAITool(fnName, args, userPerms, c)
+			result := executeAITool(fnName, args, userPerms, audit)
 			var resultJSON interface{}
 			if err := json.Unmarshal([]byte(result), &resultJSON); err != nil {
 				resultJSON = result

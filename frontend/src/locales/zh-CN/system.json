@@ -422,7 +422,14 @@
       "suggestDataStat": "数据统计",
       "suggestDataStatText": "获取系统统计信息",
       "suggestMenuTree": "菜单结构",
-      "suggestMenuTreeText": "查看菜单树结构"
+      "suggestMenuTreeText": "查看菜单树结构",
+      "subtitle": "用自然语言查询与操作系统，支持多会话并行、切页面不中断",
+      "generatingCount": "{n} 个生成中",
+      "renameSession": "重命名会话",
+      "renamePrompt": "请输入新的会话名称",
+      "renameOk": "会话已重命名",
+      "msgCount": "{n} 条",
+      "newChat": "新对话"
     },
     "providers": {
       "title": "模型密钥管理",
