@@ -4,8 +4,8 @@
     <transition name="session-slide">
       <div v-show="!isMobile || sessionDrawerOpen" class="session-panel">
         <div class="session-panel-header">
-          <span class="session-panel-title">{{ t('system.ai.chat.sessions') }}</span>
-          <el-tooltip :content="t('system.ai.chat.newSession')" placement="bottom">
+          <span class="session-panel-title">会话</span>
+          <el-tooltip content="新建会话" placement="bottom">
             <button class="icon-btn" @click="newSession">
               <el-icon :size="16"><Plus /></el-icon>
             </button>
@@ -19,39 +19,24 @@
             :class="{ active: s.id === activeSessionId }"
             @click="switchSession(s.id)"
           >
-            <div class="session-item-row">
-              <el-icon class="session-item-icon" :size="15"><ChatDotRound /></el-icon>
-              <span class="session-item-title" :title="s.title">{{ s.title }}</span>
-              <span v-if="isSessionStreaming(s.id)" class="session-live-dot" :title="t('system.ai.chat.generatingCount', { n: 1 })"></span>
-              <el-icon
-                class="session-item-del"
-                :size="14"
-                @click.stop="confirmDeleteSession(s)"
-              ><Delete /></el-icon>
+            <div class="session-item-main">
+              <div class="session-item-top">
+                <span class="session-item-title" :title="s.title">{{ s.title }}</span>
+                <span v-if="isSessionWorking(s.id)" class="session-status-dot" title="生成中"></span>
+              </div>
+              <div class="session-item-sub">
+                <span>{{ formatSessionTime(s.updated_at) }}</span>
+                <span>·</span>
+                <span>{{ s.message_count }} 条</span>
+              </div>
             </div>
-            <div class="session-item-sub">
-              <span>{{ formatSessionTime(s.updated_at) }}</span>
-              <span class="session-item-count">{{ t('system.ai.chat.msgCount', { n: s.message_count }) }}</span>
-            </div>
+            <el-icon
+              class="session-item-del"
+              :size="14"
+              @click.stop="confirmDeleteSession(s)"
+            ><Delete /></el-icon>
           </div>
-          <!-- 未落库的进行中新对话（并行生成时可切回） -->
-          <div
-            v-for="tk in activeTempKeys"
-            :key="tk"
-            class="session-item"
-            :class="{ active: activeKey === tk }"
-            @click="switchToTemp(tk)"
-          >
-            <div class="session-item-row">
-              <el-icon class="session-item-icon" :size="15"><EditPen /></el-icon>
-              <span class="session-item-title">{{ t('system.ai.chat.newChat') }}</span>
-              <span v-if="isKeyStreaming(tk)" class="session-live-dot"></span>
-            </div>
-            <div class="session-item-sub">
-              <span>{{ t('system.ai.chat.generatingCount', { n: 1 }) }}</span>
-            </div>
-          </div>
-          <div v-if="sessions.length === 0 && activeTempKeys.length === 0" class="session-empty">{{ t('system.ai.chat.noSessions') }}</div>
+          <div v-if="sessions.length === 0" class="session-empty">暂无历史会话</div>
         </div>
       </div>
     </transition>
@@ -64,42 +49,25 @@
 
     <!-- 主聊天区 -->
     <div class="chat-main">
-      <!-- 顶栏（轻量：仅会话名；供应商/模型已收纳进底部 composer） -->
-      <div class="chat-header">
-        <div class="chat-header-left">
-          <button v-if="isMobile" class="icon-btn" @click="sessionDrawerOpen = true">
-            <el-icon :size="18"><Menu /></el-icon>
-          </button>
-          <el-icon v-if="streaming" class="header-live-spin" :size="14"><Loading /></el-icon>
-          <span class="chat-title">{{ activeTitle }}</span>
-        </div>
-        <div class="chat-header-right">
-          <button class="icon-btn" :title="t('system.ai.chat.renameSession')" @click="renameActiveSession">
-            <el-icon :size="16"><EditPen /></el-icon>
-          </button>
-        </div>
+      <!-- 顶部状态条（仅会话状态，工具收纳进输入框） -->
+      <div v-if="workingSessionCount > 0 || isMobile" class="chat-statusbar">
+        <button v-if="isMobile" class="icon-btn" @click="sessionDrawerOpen = true">
+          <el-icon :size="18"><Menu /></el-icon>
+        </button>
+        <span v-if="workingSessionCount > 0" class="running-badge">
+          <span class="running-dot"></span>{{ workingSessionCount }} 个生成中
+        </span>
       </div>
 
       <!-- 消息区域 -->
       <div ref="messagesRef" class="chat-messages" @scroll="handleScroll">
-        <!-- 其它会话生成中胶囊（多会话并行） -->
-        <div
-          v-if="backgroundGenerating.length > 0"
-          class="generating-pill"
-          @click="jumpToBackgroundSession"
-        >
-          <el-icon :size="12" class="pill-spin"><Loading /></el-icon>
-          <span>{{ t('system.ai.chat.generatingCount', { n: generatingCount }) }}</span>
-          <el-icon :size="12"><ArrowRight /></el-icon>
-        </div>
-
         <!-- 欢迎提示 -->
-        <div v-if="messages.length === 0" class="chat-welcome">
+        <div v-if="displayMessages.length === 0" class="chat-welcome">
           <div class="welcome-logo">
             <el-icon :size="30" color="#fff"><ChatDotRound /></el-icon>
           </div>
-          <h3>{{ t('system.ai.chat.welcome') }}</h3>
-          <p class="welcome-subtitle">{{ t('system.ai.chat.subtitle') }}</p>
+          <h3>有什么可以帮您？</h3>
+          <p class="welcome-sub">用自然语言查询与操作系统，支持多会话并行、切页面不中断</p>
           <div class="welcome-suggestions">
             <div
               v-for="s in suggestions"
@@ -118,18 +86,17 @@
 
         <!-- 消息列表 -->
         <div
-          v-for="(msg, i) in messages"
-          :key="i"
+          v-for="(msg, i) in displayMessages"
+          :key="msg.key"
           class="message-row"
-          :class="msg.role"
+          :class="[msg.role, { 'is-pending': msg.pending }]"
         >
-          <div class="message-avatar">
-            <el-icon v-if="msg.role === 'user'" :size="18" color="#fff"><User /></el-icon>
-            <el-icon v-else :size="18" color="#fff"><ChatDotRound /></el-icon>
-          </div>
-          <div class="message-body">
+          <div class="msg-main">
             <div class="message-meta">
-              <span class="message-role">{{ msg.role === 'user' ? t('system.ai.chat.roleUser') : t('system.ai.chat.roleAssistant') }}</span>
+              <span class="speaker-label">{{ msg.role === 'user' ? '我' : 'AI 助手' }}</span>
+              <span v-if="msg.time" class="message-time">{{ msg.time }}</span>
+              <span v-if="msg.pending" class="queue-tag"><el-icon :size="12"><Clock /></el-icon>生成中</span>
+              <span v-else-if="msg.queued" class="queue-tag queued"><el-icon :size="12"><Clock /></el-icon>排队中</span>
             </div>
             <!-- 工具调用状态 -->
             <div v-if="msg.toolEvents && msg.toolEvents.length" class="tool-events">
@@ -148,18 +115,24 @@
               class="message-content markdown-body"
               v-html="renderMarkdown(msg.content)"
             ></div>
+            <!-- 排队消息操作 -->
+            <div v-if="msg.queued && msg.runId" class="message-actions" :class="{ user: true }">
+              <button class="msg-action-btn withdraw-btn" @click="withdrawQueued(msg.runId)">
+                <el-icon :size="13"><Close /></el-icon>撤回
+              </button>
+            </div>
             <!-- 错误信息 -->
             <div v-if="msg.error" class="message-error">
               <el-icon><WarningFilled /></el-icon>
               {{ msg.error }}
             </div>
             <!-- 正在输入指示 -->
-            <div v-if="msg.streaming && !msg.content" class="typing-indicator">
+            <div v-if="msg.streaming && !msg.content && !msg.error" class="typing-indicator">
               <span></span><span></span><span></span>
             </div>
             <!-- 消息操作（复制） -->
             <div v-if="msg.content && !msg.streaming" class="message-actions" :class="{ user: msg.role === 'user' }">
-              <el-tooltip :content="t('system.ai.chat.copy')" placement="top">
+              <el-tooltip content="复制" placement="top">
                 <button class="msg-action-btn" @click="copyMessage(msg)">
                   <el-icon :size="13"><CopyDocument /></el-icon>
                 </button>
@@ -169,39 +142,60 @@
         </div>
       </div>
 
-      <!-- 输入区域 -->
-      <div class="chat-input-area">
-        <div class="chat-input-wrapper">
+      <!-- 输入区域（qm 式大圆角卡片） -->
+      <div class="composer-area">
+        <div v-if="queuedRuns.length > 0" class="queue-note">
+          <el-icon :size="13"><Clock /></el-icon>
+          已排队 {{ queuedRuns.length }} 条消息，将按顺序执行
+        </div>
+        <div class="composer-wrap">
+          <div v-if="isBusy" class="generating-tip">
+            <el-icon class="is-loading" :size="13"><Loading /></el-icon>
+            <span>正在生成回复，可随时切换其他会话继续提问</span>
+            <button class="stop-inline" @click="stopActive">
+              <el-icon :size="12"><VideoPause /></el-icon>停止
+            </button>
+          </div>
           <el-input
             v-model="inputText"
             type="textarea"
-            :rows="2"
-            :autosize="{ minRows: 2, maxRows: 6 }"
-            :placeholder="t('system.ai.chat.inputPlaceholder')"
+            :rows="1"
+            :autosize="{ minRows: 1, maxRows: 6 }"
+            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
             resize="none"
             @keydown.enter.exact.prevent="sendMessage"
           />
-          <div class="input-actions">
-            <div class="input-actions-left">
-              <el-tooltip :content="t('system.ai.chat.toolsTip')" placement="top">
+          <div class="composer-toolbar">
+            <div class="composer-left">
+              <el-tooltip content="启用工具调用（允许 AI 查询/操作系统数据）" placement="top">
                 <div class="tools-toggle">
                   <el-icon :size="14"><SetUp /></el-icon>
-                  <span>{{ t('system.ai.chat.tools') }}</span>
+                  <span>工具</span>
                   <el-switch v-model="enableTools" size="small" />
                 </div>
               </el-tooltip>
-              <el-tooltip :content="t('system.ai.chat.clearChat')" placement="top">
-                <button class="composer-icon-btn" @click="clearChat">
-                  <el-icon :size="15"><Delete /></el-icon>
-                </button>
-              </el-tooltip>
+              <span class="char-count" v-if="inputText.length">{{ inputText.length }}</span>
+              <!-- 会话操作（收纳进输入框） -->
+              <template v-if="activeSessionId != null">
+                <span class="toolbar-sep"></span>
+                <el-tooltip content="重命名会话" placement="top">
+                  <button class="toolbar-icon-btn" @click="renameActiveSession">
+                    <el-icon :size="14"><EditPen /></el-icon>
+                  </button>
+                </el-tooltip>
+                <el-tooltip content="清空当前对话（历史仍保留在会话中）" placement="top">
+                  <button class="toolbar-icon-btn" @click="clearChat">
+                    <el-icon :size="14"><Delete /></el-icon>
+                  </button>
+                </el-tooltip>
+              </template>
             </div>
-            <div class="input-actions-right">
-              <!-- 供应商 / 模型：无边框透明下拉（收纳进 composer） -->
+            <div class="composer-right">
+              <!-- 模型选择（收纳进输入框，qm 式） -->
               <el-select
                 v-model="selectedProviderId"
-                :placeholder="t('system.ai.chat.provider')"
-                class="ghost-select provider-ghost"
+                placeholder="供应商"
+                class="provider-select"
                 size="small"
                 @change="onProviderChange"
               >
@@ -214,26 +208,24 @@
               </el-select>
               <el-select
                 v-model="selectedModel"
-                :placeholder="t('system.ai.chat.model')"
-                class="ghost-select model-ghost"
+                placeholder="模型"
+                class="model-select"
                 size="small"
                 :disabled="modelOptions.length === 0"
                 @change="saveModelChoice"
               >
                 <el-option v-for="m in modelOptions" :key="m" :label="m" :value="m" />
               </el-select>
-              <button
-                v-if="!streaming"
-                class="send-btn"
-                :disabled="!inputText.trim()"
-                :title="t('system.ai.chat.send')"
-                @click="sendMessage"
-              >
-                <el-icon :size="17"><Promotion /></el-icon>
-              </button>
-              <button v-else class="send-btn stop" :title="t('system.ai.chat.stop')" @click="stopStreaming">
-                <el-icon :size="15"><VideoPause /></el-icon>
-              </button>
+              <el-tooltip v-if="isBusy" content="停止生成" placement="top">
+                <button class="stop-square" @click="stopActive">
+                  <el-icon :size="15"><VideoPause /></el-icon>
+                </button>
+              </el-tooltip>
+              <el-tooltip content="发送（Enter）" placement="top">
+                <button class="send-square" :disabled="!inputText.trim()" @click="sendMessage">
+                  <el-icon :size="16"><Promotion /></el-icon>
+                </button>
+              </el-tooltip>
             </div>
           </div>
         </div>
@@ -242,77 +234,14 @@
   </div>
 </template>
 
-<script lang="ts">
-// ─────────────────────────────────────────────────────────────────────────
-// 模块级会话流状态（跨组件实例保留）
-// 放在 setup 外部：切出「AI 全能助手」页面时组件销毁，但后台 run 订阅与
-// 视图状态继续存在，切回页面从同一 Map 恢复——「多会话并行、切页面不中断」。
-// key 规则：已落库会话 's{id}'；未落库新对话 't{n}'。
-// ─────────────────────────────────────────────────────────────────────────
-interface ToolEvent {
-  type: 'tool_call' | 'tool_result'
-  name: string
-  arguments?: any
-  result?: any
-}
-
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-  streaming?: boolean
-  error?: string
-  toolEvents?: ToolEvent[]
-}
-
-type RunStatus = 'pending' | 'running' | 'done' | 'failed' | 'stopped'
-
-/** 一条后台 run 的前端视图（SSE 订阅持有者） */
-interface LiveRun {
-  runId: number
-  sessionId: number | null
-  status: RunStatus
-  question: string
-  answer: string
-  toolEvents: ToolEvent[]
-  error: string | null
-  asstIdx: number // 对应 st.msgs 中 assistant 占位的下标
-  detach: (() => void) | null
-  reconnect: number
-}
-
-/** 单个会话/新对话的视图状态 */
-interface StreamState {
-  msgs: Message[]
-  run: LiveRun | null
-  queue: number[]
-  pendingRuns: Map<number, LiveRun>
-}
-
-const sessionStreams = new Map<string, StreamState>()
-let tempSeq = 0
-let lastActiveKey = '' // 记住最后活跃会话，切页/刷新回来恢复
-
-function isTerminalStatus(s: RunStatus | undefined): boolean {
-  return s === 'done' || s === 'failed' || s === 'stopped'
-}
-</script>
-
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getAllProviders,
-  getChatSessions,
   getChatSessionMessages,
-  renameChatSession,
-  deleteChatSession,
-  createChatRun,
-  getChatRun,
-  stopChatRun,
-  getActiveChatRun,
-  subscribeRunEvents,
 } from '@/api'
+import { useAiChatStore } from '@/stores/aiChat'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import Prism from 'prismjs'
@@ -332,6 +261,26 @@ import 'prismjs/components/prism-php.min.js'
 import 'prismjs/components/prism-markdown.min.js'
 import 'prismjs/components/prism-ini.min.js'
 
+interface ToolEvent {
+  type: 'tool_call' | 'tool_result'
+  name: string
+  arguments?: any
+  result?: any
+}
+
+interface DisplayMessage {
+  key: string
+  role: 'user' | 'assistant'
+  content: string
+  time?: string
+  toolEvents?: ToolEvent[]
+  error?: string | null
+  streaming?: boolean
+  pending?: boolean
+  queued?: boolean
+  runId?: number
+}
+
 interface ChatSessionItem {
   id: number
   title: string
@@ -339,102 +288,24 @@ interface ChatSessionItem {
   updated_at: string | null
 }
 
+const store = useAiChatStore()
+
+// 会话列表来自全局 store（切页面后状态仍在）
+const sessions = computed(() => store.sessions)
+
 const messagesRef = ref<HTMLElement>()
-const { t } = useI18n()
 const inputText = ref('')
 const enableTools = ref(true)
 const providers = ref<any[]>([])
 const selectedProviderId = ref<number | null>(null)
 const selectedModel = ref<string>('')
-
-const sessions = ref<ChatSessionItem[]>([])
 const activeSessionId = ref<number | null>(null)
-// 当前未落库新对话的临时 key（null = 无临时对话）
-const activeTempKey = ref<string | null>(null)
-
+const historyMessages = ref<DisplayMessage[]>([])
 const sessionDrawerOpen = ref(false)
 const isMobile = ref(window.innerWidth <= 991)
 
 const STORAGE_KEY = 'apeadmin_ai_chat_pref'
-
-// ─── 会话流状态桥接（模块级 Map ↔ 响应式视图） ───
-// Map 本身非响应式：用版本号驱动视图刷新
-const streamVersion = ref(0)
-function touchStream() {
-  streamVersion.value++
-}
-
-/** 当前视图使用的流 key */
-const activeKey = computed(() => {
-  if (activeSessionId.value) return 's' + activeSessionId.value
-  return activeTempKey.value || ''
-})
-
-/** 当前会话消息（无状态则空数组展示欢迎页） */
-const messages = computed(() => {
-  void streamVersion.value // 依赖版本号触发刷新
-  return sessionStreams.get(activeKey.value)?.msgs ?? []
-})
-
-/** 当前会话是否生成中 */
-const streaming = computed(() => {
-  void streamVersion.value
-  const run = sessionStreams.get(activeKey.value)?.run
-  return !!run && !isTerminalStatus(run.status)
-})
-
-/** 生成中的会话总数 */
-const generatingCount = computed(() => {
-  void streamVersion.value
-  let n = 0
-  sessionStreams.forEach((st) => {
-    if (st.run && !isTerminalStatus(st.run.status)) n++
-  })
-  return n
-})
-
-/** 非当前视图的生成中 key（胶囊点击目标） */
-const backgroundGenerating = computed(() => {
-  void streamVersion.value
-  const keys: string[] = []
-  sessionStreams.forEach((st, k) => {
-    if (st.run && !isTerminalStatus(st.run.status) && k !== activeKey.value) keys.push(k)
-  })
-  return keys
-})
-
-/** 侧栏里展示的、非当前视图的新对话（未落库/生成中） */
-const activeTempKeys = computed(() => {
-  void streamVersion.value
-  const keys: string[] = []
-  sessionStreams.forEach((st, k) => {
-    if (k.startsWith('t') && k !== activeKey.value && st.msgs.length > 0) keys.push(k)
-  })
-  return keys
-})
-
-/** 顶栏标题：当前会话名 */
-const activeTitle = computed(() => {
-  if (activeSessionId.value) {
-    const s = sessions.value.find((x) => x.id === activeSessionId.value)
-    if (s) return s.title
-    return t('system.ai.chat.title')
-  }
-  const st = activeTempKey.value ? sessionStreams.get(activeTempKey.value) : null
-  if (st && st.msgs.length) return t('system.ai.chat.newChat')
-  return t('system.ai.chat.title')
-})
-
-function isSessionStreaming(id: number): boolean {
-  void streamVersion.value
-  const run = sessionStreams.get('s' + id)?.run
-  return !!run && !isTerminalStatus(run.status)
-}
-function isKeyStreaming(key: string): boolean {
-  void streamVersion.value
-  const run = sessionStreams.get(key)?.run
-  return !!run && !isTerminalStatus(run.status)
-}
+const LAST_SESSION_KEY = 'apeadmin_ai_chat_last_session'
 
 const currentProvider = computed(() =>
   providers.value.find((p) => p.id === selectedProviderId.value)
@@ -453,11 +324,77 @@ const modelOptions = computed(() => {
 })
 
 const suggestions = [
-  { icon: 'User', title: t('system.ai.chat.suggestQueryUser'), text: t('system.ai.chat.suggestQueryUserText') },
-  { icon: 'Avatar', title: t('system.ai.chat.suggestRoleManage'), text: t('system.ai.chat.suggestRoleManageText') },
-  { icon: 'DataAnalysis', title: t('system.ai.chat.suggestDataStat'), text: t('system.ai.chat.suggestDataStatText') },
-  { icon: 'Menu', title: t('system.ai.chat.suggestMenuTree'), text: t('system.ai.chat.suggestMenuTreeText') },
+  { icon: 'User', title: '查询用户', text: '查询系统所有用户' },
+  { icon: 'Avatar', title: '角色管理', text: '系统有哪些角色？' },
+  { icon: 'DataAnalysis', title: '数据统计', text: '获取系统统计信息' },
+  { icon: 'Menu', title: '菜单结构', text: '查看菜单树结构' },
 ]
+
+// ---------- 会话运行状态（来自全局 store） ----------
+function currentRunOf(sessionId: number | null) {
+  if (sessionId == null) return null
+  const runId = store.currentRunBySession.get(sessionId)
+  return runId != null ? store.runs.get(runId) ?? null : null
+}
+
+const activeRun = computed(() => currentRunOf(activeSessionId.value))
+
+const isBusy = computed(
+  () => activeRun.value != null && ['pending', 'running'].includes(activeRun.value.status)
+)
+
+const queuedRuns = computed(() => {
+  const sid = activeSessionId.value
+  if (sid == null) return []
+  const q = store.queueBySession.get(sid) || []
+  return q.map((id) => store.runs.get(id)).filter(Boolean) as any[]
+})
+
+/** 展示消息 = 历史消息 + 活跃 run（问题去重）+ 排队 run 的问题 */
+const displayMessages = computed<DisplayMessage[]>(() => {
+  const msgs: DisplayMessage[] = [...historyMessages.value]
+  const run = activeRun.value
+  if (run) {
+    // 后端在入队时就已把问题落库；仅当历史里还没有时才追加（避免重复）
+    const lastHis = msgs[msgs.length - 1]
+    const qInHistory = lastHis && lastHis.role === 'user' && lastHis.content === run.question
+    if (!qInHistory) {
+      msgs.push({ key: `u-${run.runId}`, role: 'user', content: run.question, pending: true })
+    }
+    msgs.push({
+      key: `a-${run.runId}`,
+      role: 'assistant',
+      content: run.answer,
+      toolEvents: run.toolEvents,
+      error: run.error,
+      streaming: run.status === 'pending' || run.status === 'running',
+      pending: run.status === 'running',
+    })
+  }
+  for (const q of queuedRuns.value) {
+    if (run && q.runId === run.runId) continue
+    const qInHistory = historyMessages.value.some(
+      (m) => m.role === 'user' && m.content === q.question
+    )
+    if (!qInHistory) {
+      msgs.push({ key: `u-${q.runId}`, role: 'user', content: q.question, queued: true, runId: q.runId })
+    }
+  }
+  return msgs
+})
+
+function isSessionWorking(sessionId: number): boolean {
+  const runId = store.currentRunBySession.get(sessionId)
+  if (runId == null) return false
+  const st = store.runs.get(runId)?.status
+  return st === 'pending' || st === 'running'
+}
+
+const workingSessionCount = computed(() => {
+  let n = 0
+  for (const s of store.sessions) if (isSessionWorking(s.id)) n++
+  return n
+})
 
 // ---------- 偏好持久化（供应商/模型） ----------
 function loadPrefs() {
@@ -494,7 +431,6 @@ marked.setOptions({
 function renderMarkdown(text: string): string {
   try {
     const html = marked.parse(text) as string
-    // DOMPurify 清洗，防 XSS；保留 code class 供 Prism 高亮
     const clean = DOMPurify.sanitize(html, {
       ADD_ATTR: ['target'],
     })
@@ -504,7 +440,6 @@ function renderMarkdown(text: string): string {
   }
 }
 
-/** 渲染完成后对消息区做语法高亮 */
 function highlightCode() {
   nextTick(() => {
     if (!messagesRef.value) return
@@ -514,20 +449,40 @@ function highlightCode() {
         try {
           Prism.highlightElement(el as HTMLElement)
         } catch {
-          /* 高亮失败忽略，保持原文本 */
+          /* 高亮失败忽略 */
         }
       }
     })
   })
 }
 
-watch(() => messages.value.map((m) => m.content).join(''), highlightCode)
+watch(() => displayMessages.value.map((m) => m.content).join(''), highlightCode)
 
 function formatToolArgs(args: any): string {
   if (!args || typeof args !== 'object') return ''
   const entries = Object.entries(args)
   if (entries.length === 0) return ''
   return entries.map(([k, v]) => `${k}=${v}`).join(', ')
+}
+
+// ---------- 时间显示 ----------
+function formatTime(iso: string | undefined | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function formatSessionTime(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  if (d.toDateString() === now.toDateString()) return hm
+  return `${d.getMonth() + 1}/${d.getDate()} ${hm}`
 }
 
 // ---------- 供应商与模型 ----------
@@ -539,7 +494,6 @@ async function loadProviders() {
     if (providers.value.length > 0) {
       const saved = providers.value.find((p) => p.id === savedProviderId)
       selectedProviderId.value = saved ? saved.id : providers.value[0].id
-      // 模型默认选中：已保存的 > 供应商列表第一个
       if (!modelOptions.value.includes(selectedModel.value)) {
         selectedModel.value = modelOptions.value[0] || ''
       }
@@ -550,232 +504,92 @@ async function loadProviders() {
 }
 
 function onProviderChange() {
-  // 切换供应商后重置模型为该供应商第一个
   selectedModel.value = modelOptions.value[0] || ''
   saveModelChoice()
 }
 
-// ---------- 会话列表 ----------
+// ---------- 会话管理 ----------
 async function loadSessions() {
-  try {
-    const data: any = await getChatSessions()
-    sessions.value = data?.items || []
-  } catch {
-    sessions.value = []
-  }
-}
-
-function upsertSessionItem(item: ChatSessionItem) {
-  const idx = sessions.value.findIndex((s) => s.id === item.id)
-  if (idx >= 0) sessions.value.splice(idx, 1, { ...sessions.value[idx], ...item })
-  else sessions.value.unshift(item)
-}
-
-// ---------- 视图状态操作 ----------
-function ensureState(key: string): StreamState {
-  let st = sessionStreams.get(key)
-  if (!st) {
-    st = { msgs: [], run: null, queue: [], pendingRuns: new Map() }
-    sessionStreams.set(key, st)
-  }
-  return st
-}
-
-function isActiveState(st: StreamState): boolean {
-  return sessionStreams.get(activeKey.value) === st
+  await store.loadSessions()
 }
 
 function newSession() {
-  // 当前已是空白新对话则复用
-  const cur = activeTempKey.value ? sessionStreams.get(activeTempKey.value) : null
-  if (!activeSessionId.value && cur && cur.msgs.length === 0 && !cur.run) {
-    sessionDrawerOpen.value = false
-    return
+  activeSessionId.value = null
+  historyMessages.value = []
+  sessionDrawerOpen.value = false
+  try {
+    localStorage.removeItem(LAST_SESSION_KEY)
+  } catch {
+    /* ignore */
   }
-  const key = 't' + ++tempSeq
-  sessionStreams.set(key, { msgs: [], run: null, queue: [], pendingRuns: new Map() })
-  activeSessionId.value = null
-  activeTempKey.value = key
-  lastActiveKey = key
-  sessionDrawerOpen.value = false
-  touchStream()
 }
 
-/** 切到某个新对话视图（并行生成时可切回） */
-function switchToTemp(key: string) {
-  activeSessionId.value = null
-  activeTempKey.value = key
-  lastActiveKey = key
-  sessionDrawerOpen.value = false
-  touchStream()
-  scrollToBottom(true)
-}
-
-/** 跳到最近一个后台生成中的会话 */
-function jumpToBackgroundSession() {
-  const key = backgroundGenerating.value[0]
-  if (!key) return
-  if (key.startsWith('s')) {
-    activeSessionId.value = Number(key.slice(1))
-    activeTempKey.value = null
-    lastActiveKey = key
-    touchStream()
-    scrollToBottom(true)
-  } else {
-    switchToTemp(key)
+async function loadHistory(sessionId: number) {
+  try {
+    const data: any = await getChatSessionMessages(sessionId)
+    const list = data?.messages || []
+    historyMessages.value = list.map((m: any, i: number) => ({
+      key: `h-${m.id ?? i}`,
+      role: m.role,
+      content: m.content,
+      time: formatTime(m.created_at),
+      toolEvents: m.tool_events || [],
+    }))
+    // 同步会话元数据（标题/计数，后端为准）
+    const s = data?.session
+    if (s) {
+      store.upsertSession({
+        id: s.id,
+        title: s.title,
+        message_count: s.message_count,
+        updated_at: s.updated_at,
+      })
+    }
+  } catch {
+    ElMessage.error('加载会话失败')
   }
 }
 
 async function switchSession(id: number) {
-  if (activeSessionId.value === id && !activeTempKey.value) return
-  activeSessionId.value = id
-  activeTempKey.value = null
-  const key = 's' + id
-  lastActiveKey = key
-  sessionDrawerOpen.value = false
-
-  const st = sessionStreams.get(key)
-  // 有活跃 run：直接看内存中的实时状态（切页返回场景）
-  if (st?.run && !isTerminalStatus(st.run.status)) {
-    touchStream()
-    scrollToBottom(true)
+  if (id === activeSessionId.value) {
+    sessionDrawerOpen.value = false
     return
   }
+  activeSessionId.value = id
+  historyMessages.value = []
+  sessionDrawerOpen.value = false
   try {
-    const data: any = await getChatSessionMessages(id)
-    if (activeSessionId.value !== id) return // 期间又切走了
-    const list = data?.messages || []
-    const state = ensureState(key)
-    state.msgs = list.map((m: any) => ({
-      role: m.role,
-      content: m.content,
-      toolEvents: m.tool_events || [],
-    }))
-    state.run = null
-    state.queue = []
-    state.pendingRuns.clear()
-    touchStream()
-    scrollToBottom(true)
-    // 恢复后台仍在进行的 run（刷新浏览器/其他页面发起）
-    await restoreSession(id)
+    localStorage.setItem(LAST_SESSION_KEY, String(id))
   } catch {
-    ElMessage.error(t('system.ai.chat.loadFailed'))
+    /* ignore */
   }
-}
-
-/** 进入会话时恢复运行中的 run（刷新页面/重开浏览器后也能续上） */
-async function restoreSession(id: number) {
-  const key = 's' + id
-  const st = sessionStreams.get(key)
-  if (!st) return false
-  if (st.run && !isTerminalStatus(st.run.status)) return true
-  try {
-    const data: any = await getActiveChatRun(id)
-    if (!data || !data.run_id) return false
-    // 历史里已有本轮提问（入队即落库），补一个 assistant 占位承接流式内容
-    st.msgs.push({
-      role: 'assistant',
-      content: data.answer || '',
-      streaming: true,
-      toolEvents: data.tool_events || [],
-    })
-    const run: LiveRun = {
-      runId: data.run_id,
-      sessionId: id,
-      status: data.status,
-      question: data.question || '',
-      answer: data.answer || '',
-      toolEvents: data.tool_events || [],
-      error: data.error || null,
-      asstIdx: st.msgs.length - 1,
-      detach: null,
-      reconnect: 0,
-    }
-    // 排队的 run id 跨刷新不可知（后端执行后自然出现），此处清空
-    if (data.queued > 0) st.queue = []
-    st.run = run
-    attach(st, run)
-    touchStream()
-    return true
-  } catch {
-    return false
-  }
+  await Promise.all([loadHistory(id), store.restoreSession(id)])
+  scrollToBottom(true)
 }
 
 async function confirmDeleteSession(s: ChatSessionItem) {
   try {
-    await ElMessageBox.confirm(t('system.ai.chat.deleteSession', { title: s.title }), t('common.feedback.tip'), {
-      confirmButtonText: t('common.actions.delete'),
-      cancelButtonText: t('common.actions.cancel'),
+    await ElMessageBox.confirm(`删除会话「${s.title}」？删除后不可恢复`, '提示', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
       type: 'warning',
     })
-    const key = 's' + s.id
-    const st = sessionStreams.get(key)
-    // 先停掉该会话的活跃/排队 run，再删库
-    if (st) {
-      if (st.run && !isTerminalStatus(st.run.status)) {
-        try {
-          await stopChatRun(st.run.runId)
-        } catch {
-          /* ignore */
-        }
-      }
-      st.run?.detach?.()
-      for (const qid of st.queue) {
-        try {
-          await stopChatRun(qid)
-        } catch {
-          /* ignore */
-        }
-      }
-      sessionStreams.delete(key)
+    const ok = await store.removeSession(s.id)
+    if (!ok) {
+      ElMessage.error('删除失败')
+      return
     }
-    await deleteChatSession(s.id)
-    sessions.value = sessions.value.filter((x) => x.id !== s.id)
     if (activeSessionId.value === s.id) {
       activeSessionId.value = null
-      activeTempKey.value = null
-      lastActiveKey = ''
-      newSession()
+      historyMessages.value = []
     }
-    touchStream()
-    ElMessage.success(t('system.ai.chat.sessionDeleted'))
-  } catch {
-    /* 用户取消 */
-  }
-}
-
-async function renameActiveSession() {
-  const sid = activeSessionId.value
-  if (!sid) {
-    ElMessage.info(t('system.ai.chat.renamePrompt'))
-    return
-  }
-  const cur = sessions.value.find((x) => x.id === sid)
-  try {
-    const res = await ElMessageBox.prompt(
-      t('system.ai.chat.renamePrompt'),
-      t('system.ai.chat.renameSession'),
-      {
-        confirmButtonText: t('common.actions.confirm'),
-        cancelButtonText: t('common.actions.cancel'),
-        inputValue: cur?.title || '',
-        inputValidator: (v: string) => (!!v && !!v.trim()) || t('system.ai.chat.renamePrompt'),
-      }
-    )
-    const title = (res.value || '').trim()
-    if (!title) return
-    await renameChatSession(sid, title)
-    if (cur) cur.title = title
-    touchStream()
-    ElMessage.success(t('system.ai.chat.renameOk'))
+    ElMessage.success('会话已删除')
   } catch {
     /* 用户取消 */
   }
 }
 
 // ---------- 滚动 ----------
-let autoScroll = true
 function scrollToBottom(force = false) {
   nextTick(() => {
     if (!messagesRef.value) return
@@ -785,130 +599,11 @@ function scrollToBottom(force = false) {
   })
 }
 
+let autoScroll = true
 function handleScroll() {
   const el = messagesRef.value
   if (!el) return
-  // 距底部 80px 内视为跟随滚动
   autoScroll = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-}
-
-// ---------- run 订阅 ----------
-/** 建立/重建 SSE 订阅（seen=0 时以服务端快照为基线，不会重复） */
-function attach(st: StreamState, run: LiveRun, seen = 0) {
-  run.detach?.()
-  run.detach = subscribeRunEvents(
-    run.runId,
-    seen,
-    (ev: any) => {
-      run.reconnect = 0
-      if (ev.type === 'snapshot') {
-        run.status = ev.status
-        run.answer = ev.answer || ''
-        run.toolEvents = ev.tool_events || []
-        run.error = ev.error || null
-      } else if (ev.type === 'run_start') {
-        run.status = 'running'
-      } else if (ev.type === 'content') {
-        run.answer += ev.content || ''
-      } else if (ev.type === 'tool_call') {
-        run.toolEvents.push({ type: 'tool_call', name: ev.name, arguments: ev.arguments })
-      } else if (ev.type === 'tool_result') {
-        run.toolEvents.push({ type: 'tool_result', name: ev.name, result: ev.result })
-      } else if (ev.type === 'run_end') {
-        run.status = ev.status
-        run.error = ev.error || null
-      } else if (ev.type === 'error') {
-        run.status = 'failed'
-        run.error = ev.message || t('system.ai.chat.requestFailed')
-      }
-      syncRunMessage(st, run)
-      touchStream()
-      if (isActiveState(st)) scrollToBottom()
-    },
-    () => onRunClosed(st, run),
-    (msg: string) => onRunError(st, run, msg)
-  )
-  syncRunMessage(st, run)
-}
-
-/** 把 run 状态同步到消息列表中的 assistant 占位 */
-function syncRunMessage(st: StreamState, run: LiveRun) {
-  const msg = st.msgs[run.asstIdx]
-  if (!msg) return
-  msg.content = run.answer
-  msg.toolEvents = run.toolEvents
-  msg.streaming = !isTerminalStatus(run.status)
-  msg.error = run.error || undefined
-}
-
-function onRunClosed(st: StreamState, run: LiveRun) {
-  if (isTerminalStatus(run.status)) {
-    finishRun(st, run)
-    return
-  }
-  if (run.reconnect < 3) {
-    reconnectRun(st, run)
-    return
-  }
-  // 多次重连失败：降级为一次性查询
-  getChatRun(run.runId)
-    .then((d: any) => {
-      run.status = d.status
-      run.answer = d.answer ?? ''
-      run.toolEvents = d.tool_events ?? []
-      run.error = d.error || run.error
-    })
-    .catch(() => {
-      run.status = 'failed'
-      run.error = run.error || t('system.ai.chat.requestFailed')
-    })
-    .finally(() => {
-      syncRunMessage(st, run)
-      touchStream()
-      finishRun(st, run)
-    })
-}
-
-function reconnectRun(st: StreamState, run: LiveRun) {
-  run.reconnect += 1
-  const delay = Math.min(1000 * 2 ** (run.reconnect - 1), 4000)
-  setTimeout(() => {
-    if (!isTerminalStatus(run.status)) attach(st, run, 0)
-  }, delay)
-}
-
-function onRunError(st: StreamState, run: LiveRun, message: string) {
-  if (run.reconnect < 3) {
-    reconnectRun(st, run)
-    return
-  }
-  run.status = 'failed'
-  run.error = run.error || message
-  syncRunMessage(st, run)
-  touchStream()
-  finishRun(st, run)
-}
-
-/** run 终态：收尾 + 接管同会话排队中的下一条 */
-function finishRun(st: StreamState, run: LiveRun) {
-  syncRunMessage(st, run)
-  run.detach?.()
-  run.detach = null
-  touchStream()
-  loadSessions()
-  while (st.queue.length > 0) {
-    const nextId = st.queue.shift()!
-    const next = st.pendingRuns.get(nextId)
-    st.pendingRuns.delete(nextId)
-    if (next && !isTerminalStatus(next.status)) {
-      st.run = next
-      attach(st, next)
-      touchStream()
-      return
-    }
-  }
-  st.run = null
-  touchStream()
 }
 
 // ---------- 发送 ----------
@@ -920,183 +615,173 @@ function sendQuickMessage(text: string) {
 async function sendMessage() {
   const text = inputText.value.trim()
   if (!text) return
+
   if (providers.value.length === 0) {
-    ElMessage.warning(t('system.ai.chat.providerRequired'))
+    ElMessage.warning('请先在「模型密钥管理」中添加模型供应商')
     return
   }
-  // 确保当前视图有状态容器
-  if (!activeKey.value) {
-    const tk = 't' + ++tempSeq
-    sessionStreams.set(tk, { msgs: [], run: null, queue: [], pendingRuns: new Map() })
-    activeTempKey.value = tk
-    lastActiveKey = tk
-  }
-  const key = activeKey.value
-  const st = ensureState(key)
-  const sessionIdAtSend = activeSessionId.value
 
-  st.msgs.push({ role: 'user', content: text })
-  st.msgs.push({ role: 'assistant', content: '', streaming: true, toolEvents: [] })
-  const asstIdx = st.msgs.length - 1
+  const res = await store.sendMessage({
+    sessionId: activeSessionId.value,
+    question: text,
+    providerId: selectedProviderId.value,
+    model: selectedModel.value || null,
+    enableTools: enableTools.value,
+  })
+  if ('error' in res) {
+    ElMessage.error(res.error)
+    return
+  }
+  if (activeSessionId.value == null) {
+    activeSessionId.value = res.sessionId
+  }
   inputText.value = ''
   autoScroll = true
-  touchStream()
   scrollToBottom(true)
-
   try {
-    const data: any = await createChatRun({
-      session_id: sessionIdAtSend,
-      question: text,
-      provider_id: selectedProviderId.value,
-      model: selectedModel.value || null,
-      enable_tools: enableTools.value,
-    })
-    const runId: number = data.run_id
-    const sessionId: number = data.session_id
-
-    // 新对话已落库：视图 key 迁移 t{n} → s{id}，侧栏即时展示
-    if (sessionIdAtSend === null) {
-      const newKey = 's' + sessionId
-      sessionStreams.delete(key)
-      sessionStreams.set(newKey, st)
-      if (activeTempKey.value === key) {
-        activeTempKey.value = null
-        activeSessionId.value = sessionId
-      }
-      if (lastActiveKey === key) lastActiveKey = newKey
-      upsertSessionItem({
-        id: sessionId,
-        title: data.title || t('system.ai.chat.newChatTitle'),
-        message_count: 0,
-        updated_at: new Date().toISOString(),
-      })
-    }
-
-    const run: LiveRun = {
-      runId,
-      sessionId,
-      status: 'pending',
-      question: text,
-      answer: '',
-      toolEvents: [],
-      error: null,
-      asstIdx,
-      detach: null,
-      reconnect: 0,
-    }
-    if (st.run && !isTerminalStatus(st.run.status)) {
-      // 同会话已有活跃 run：后端 FIFO 排队，当前 run 结束后自动接管
-      st.pendingRuns.set(runId, run)
-      st.queue.push(runId)
-    } else {
-      st.run = run
-      attach(st, run)
-    }
-    touchStream()
-    scrollToBottom()
-  } catch (e: any) {
-    const msg = st.msgs[asstIdx]
-    if (msg) {
-      msg.streaming = false
-      msg.error = e?.message || t('system.ai.chat.requestFailed')
-    }
-    touchStream()
-    ElMessage.error(e?.message || t('system.ai.chat.requestFailed'))
+    localStorage.setItem(LAST_SESSION_KEY, String(res.sessionId))
+  } catch {
+    /* ignore */
   }
 }
 
-async function stopStreaming() {
-  const st = sessionStreams.get(activeKey.value)
-  const run = st?.run
-  if (!st || !run || isTerminalStatus(run.status)) return
-  try {
-    await stopChatRun(run.runId)
-  } catch {
-    /* 忽略：仍以服务端事件为准 */
+// ---------- 运行终态 → 合入历史 ----------
+// 监听 store 的完成版本号（而非 run.status）：页面卸载期间错过的终态也能在回归后被
+// sweepTerminalRuns + loadHistory 补齐；同会话连续排队时每次完成都会触发刷新
+watch(
+  () => {
+    const sid = activeSessionId.value
+    return sid == null ? 0 : store.completedVersion.get(sid) || 0
+  },
+  async () => {
+    const sid = activeSessionId.value
+    if (sid == null) return
+    const curId = store.currentRunBySession.get(sid)
+    const cur = curId != null ? store.runs.get(curId) : null
+    // 先刷新历史（服务端为准），避免闪烁：终态 run 仍在 store 中展示完整内容
+    await loadHistory(sid)
+    // 仅当当前 run 已终态且无排队时才清理（排队接管时 cur 是新的活跃 run，不能动）
+    const qLen = (store.queueBySession.get(sid) || []).length
+    if (cur && ['done', 'failed', 'stopped'].includes(cur.status) && qLen === 0) {
+      store.finishRun(sid)
+    }
+    scrollToBottom()
+    if (cur && cur.status === 'failed' && !cur.answer) {
+      ElMessage.error('生成失败：' + (cur.error || '未知错误'))
+    }
   }
-  // 无订阅（断网等）时本地兜底收尾
-  if (!run.detach) {
-    run.status = 'stopped'
-    syncRunMessage(st, run)
-    touchStream()
-    finishRun(st, run)
+)
+
+// 排队 run 被接管为活跃 run（前一个完成后）
+watch(
+  () => {
+    const sid = activeSessionId.value
+    if (sid == null) return null
+    return store.currentRunBySession.get(sid) ?? null
+  },
+  (newId, oldId) => {
+    if (newId != null && newId !== oldId) scrollToBottom(true)
   }
+)
+
+// live 内容变化 → 跟随滚动
+watch(
+  () => activeRun.value?.answer,
+  () => scrollToBottom()
+)
+
+// ---------- 停止 / 撤回 ----------
+async function stopActive() {
+  const sid = activeSessionId.value
+  if (sid == null) return
+  await store.stopRun(sid)
+}
+
+async function withdrawQueued(runId: number) {
+  const sid = activeSessionId.value
+  if (sid == null) return
+  await store.withdrawQueued(sid, runId)
 }
 
 function clearChat() {
-  if (messages.value.length === 0) return
-  ElMessageBox.confirm(t('system.ai.chat.clearConfirm'), t('common.feedback.tip'), {
-    confirmButtonText: t('system.ai.chat.clear'),
-    cancelButtonText: t('common.actions.cancel'),
+  if (historyMessages.value.length === 0 && !activeRun.value) return
+  ElMessageBox.confirm('清空当前对话显示？（历史消息已保存在会话中，可从左侧切换回来）', '提示', {
+    confirmButtonText: '清空',
+    cancelButtonText: '取消',
     type: 'warning',
   })
     .then(() => {
-      // 仅切换视图（历史仍在会话列表中，可随时切回）
+      historyMessages.value = []
       activeSessionId.value = null
-      activeTempKey.value = null
-      lastActiveKey = ''
-      newSession()
+      try {
+        localStorage.removeItem(LAST_SESSION_KEY)
+      } catch {
+        /* ignore */
+      }
     })
     .catch(() => {})
 }
 
-// ---------- 辅助 ----------
-function formatSessionTime(iso?: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  if (d.toDateString() === now.toDateString()) {
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+async function renameActiveSession() {
+  const sid = activeSessionId.value
+  if (sid == null) return
+  const s = store.sessions.find((x) => x.id === sid)
+  if (!s) return
+  try {
+    const { value } = await ElMessageBox.prompt('新的会话名称', '重命名会话', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValue: s.title,
+      inputValidator: (v: string) =>
+        (v && v.trim().length > 0 && v.trim().length <= 200) || '名称不能为空且不超过 200 字',
+    })
+    const title = (value || '').trim()
+    if (!title || title === s.title) return
+    const { renameChatSession } = await import('@/api')
+    await renameChatSession(sid, title)
+    s.title = title
+    ElMessage.success('已重命名')
+  } catch {
+    /* 用户取消 */
   }
-  if (d.getFullYear() === now.getFullYear()) {
-    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  }
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-async function copyMessage(msg: Message) {
+// ---------- 复制 ----------
+async function copyMessage(msg: DisplayMessage) {
   try {
     await navigator.clipboard.writeText(msg.content)
-    ElMessage.success(t('common.feedback.copySuccess'))
+    ElMessage.success('已复制')
   } catch {
-    ElMessage.error(t('common.feedback.copyFailed'))
+    ElMessage.error('复制失败')
   }
 }
 
+// ---------- 移动端检测 ----------
 function onResize() {
   isMobile.value = window.innerWidth <= 991
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('resize', onResize)
-  loadProviders()
-  loadSessions().then(() => {
-    // 清理滞留的终态 run（历史中已有最终内容）
-    sessionStreams.forEach((st) => {
-      if (st.run && isTerminalStatus(st.run.status)) {
-        st.run.detach?.()
-        st.run = null
-      }
-    })
-    // 恢复上次停留的会话（组件切回/刷新后）
-    if (lastActiveKey.startsWith('s')) {
-      const id = Number(lastActiveKey.slice(1))
-      if (sessions.value.some((s) => s.id === id)) {
-        switchSession(id)
-      }
-    } else if (lastActiveKey.startsWith('t') && sessionStreams.has(lastActiveKey)) {
-      activeSessionId.value = null
-      activeTempKey.value = lastActiveKey
-      touchStream()
-    }
-  })
+  await Promise.all([loadProviders(), loadSessions()])
+  // 清理卸载期间滞留的终态 run（历史里已含其内容）
+  store.sweepTerminalRuns()
+  // 恢复上次会话视图（含运行中的 run 续流）
+  let lastId: number | null = null
+  try {
+    const raw = localStorage.getItem(LAST_SESSION_KEY)
+    if (raw) lastId = parseInt(raw, 10) || null
+  } catch {
+    /* ignore */
+  }
+  if (lastId != null && store.sessions.some((s) => s.id === lastId)) {
+    await switchSession(lastId)
+  }
 })
 
 onBeforeUnmount(() => {
-  // 只解绑 DOM 监听；后台 run 订阅挂在模块级 Map 上，切页面不中断
   window.removeEventListener('resize', onResize)
+  // 注意：不终止后台运行！SSE 订阅由全局 store 持有，切页面后继续接收。
 })
 </script>
 
@@ -1145,56 +830,30 @@ onBeforeUnmount(() => {
 }
 .session-item {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  padding: 8px 10px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 11px;
   border-radius: 8px;
   cursor: pointer;
   color: var(--text-regular, #606266);
   font-size: 13px;
-  transition: background 0.15s;
-}
-.session-item-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.session-item-sub {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-left: 23px;
-  font-size: 11px;
-  line-height: 1.2;
-  color: var(--text-secondary, #909399);
-}
-.session-item-count {
-  flex-shrink: 0;
-}
-.session-live-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #22c55e;
-  flex-shrink: 0;
-  animation: live-breathe 1.4s ease-in-out infinite;
-}
-@keyframes live-breathe {
-  0%, 100% { opacity: 0.35; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1); }
+  transition: background 0.12s;
 }
 .session-item:hover {
-  background: var(--fill-hover, #f5f7fa);
+  background: rgba(127, 138, 248, 0.07);
 }
 .session-item.active {
   background: var(--el-color-primary-light-9, #ecf0ff);
   color: var(--el-color-primary, #5a67f5);
 }
-.session-item-icon {
-  flex-shrink: 0;
+.session-item-main {
+  flex: 1;
+  min-width: 0;
+}
+.session-item-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .session-item-title {
   flex: 1;
@@ -1202,6 +861,25 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.session-item-sub {
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary, #909399);
+  margin-top: 2px;
+}
+.session-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--el-color-success, #67c23a);
+  flex-shrink: 0;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
 }
 .session-item-del {
   flex-shrink: 0;
@@ -1236,41 +914,78 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* Header */
-.chat-header {
+/* Statusbar（生成状态胶囊，无工具占用） */
+.chat-statusbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  background: var(--theme-card-bg, #fff);
-  border-bottom: 1px solid var(--border-light, #ebeef5);
+  gap: 8px;
+  min-height: 8px;
+  padding: 6px 16px 0;
   flex-shrink: 0;
-  gap: 8px;
 }
-.chat-header-left {
-  display: flex;
+.running-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.chat-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary, #303133);
+  gap: 5px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--el-color-success-light-9, #f0f9eb);
+  color: var(--el-color-success, #67c23a);
+  font-size: 12px;
   white-space: nowrap;
 }
-.chat-header-right {
-  display: flex;
+.running-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--el-color-success, #67c23a);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+/* composer 内的小尺寸下拉 */
+.composer-right .provider-select {
+  width: 128px;
+}
+.composer-right .model-select {
+  width: 150px;
+}
+.composer-right :deep(.el-select__wrapper) {
+  background: transparent;
+  box-shadow: none;
+  min-height: 28px;
+  padding: 0 4px;
+}
+.composer-right :deep(.el-select__wrapper):hover {
+  background: var(--fill-hover, #f5f7fa);
+  border-radius: 7px;
+}
+.composer-right :deep(.el-select__placeholder),
+.composer-right :deep(.el-select__selected-item) {
+  font-size: 12.5px;
+  color: var(--text-secondary, #909399);
+}
+/* composer 工具栏里的会话操作小按钮 */
+.toolbar-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border-light, #dcdfe6);
+  margin: 0 2px;
+}
+.toolbar-icon-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary, #909399);
+  cursor: pointer;
+  transition: all 0.12s ease;
 }
-.header-live-spin {
+.toolbar-icon-btn:hover {
+  background: var(--fill-hover, #f5f7fa);
   color: var(--el-color-primary, #5a67f5);
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 .icon-btn {
   display: inline-flex;
@@ -1294,7 +1009,7 @@ onBeforeUnmount(() => {
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 20px 16px;
   scroll-behavior: smooth;
 }
 .chat-messages::-webkit-scrollbar {
@@ -1305,48 +1020,20 @@ onBeforeUnmount(() => {
   border-radius: 3px;
 }
 
-/* 生成中胶囊（多会话并行时提示后台生成） */
-.generating-pill {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: fit-content;
-  margin: 0 auto 12px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: var(--el-color-primary-light-9, #ecf0ff);
-  color: var(--el-color-primary, #5a67f5);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(90, 103, 245, 0.12);
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-.generating-pill:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(90, 103, 245, 0.2);
-}
-.pill-spin {
-  animation: spin 1s linear infinite;
-}
-
 /* Welcome */
 .chat-welcome {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   height: 100%;
   text-align: center;
   padding: 24px;
 }
 .welcome-logo {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
   background: linear-gradient(135deg, var(--el-color-primary, #5a67f5), #47d8ff);
   display: flex;
   align-items: center;
@@ -1354,14 +1041,16 @@ onBeforeUnmount(() => {
   box-shadow: 0 8px 20px rgba(90, 103, 245, 0.25);
 }
 .chat-welcome h3 {
-  margin: 16px 0 6px;
-  font-size: 19px;
+  margin: 16px 0 4px;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   color: var(--text-primary, #303133);
 }
-.welcome-subtitle {
-  margin: 0 0 22px;
+.welcome-sub {
   font-size: 13px;
   color: var(--text-secondary, #909399);
+  margin: 0 0 20px;
 }
 .welcome-suggestions {
   display: grid;
@@ -1407,69 +1096,73 @@ onBeforeUnmount(() => {
   margin-top: 2px;
 }
 
-/* Message row */
+/* Message row（qm 式：无头像、speaker 小标签、assistant 文档流、user 低饱和气泡） */
 .message-row {
   display: flex;
-  gap: 10px;
-  margin-bottom: 18px;
-  max-width: 860px;
-  margin-left: auto;
-  margin-right: auto;
+  min-width: 0;
+  max-width: 760px;
+  margin: 0 auto 4px;
+  padding-bottom: 12px;
 }
 .message-row.user {
-  flex-direction: row-reverse;
+  flex-direction: column;
+  align-items: flex-end;
 }
-.message-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.message-row.user .message-avatar {
-  background: var(--el-color-primary, #5a67f5);
-}
-.message-row.assistant .message-avatar {
-  background: linear-gradient(135deg, var(--el-color-primary, #5a67f5), #47d8ff);
-}
-.message-body {
-  flex: 1;
+.msg-main {
   min-width: 0;
+  max-width: 100%;
 }
 .message-meta {
-  margin-bottom: 4px;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.message-role {
-  font-size: 12px;
+.speaker-label {
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-secondary, #909399);
+  user-select: none;
 }
 .message-row.user .message-meta {
-  text-align: right;
+  justify-content: flex-end;
+}
+.message-time {
+  font-size: 11px;
+  color: var(--text-secondary, #c0c4cc);
+}
+.queue-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--el-color-success, #67c23a);
+  background: var(--el-color-success-light-9, #f0f9eb);
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.queue-tag.queued {
+  color: var(--el-color-warning, #e6a23c);
+  background: var(--el-color-warning-light-9, #fdf6ec);
 }
 
 /* Message content */
 .message-content {
-  display: inline-block;
-  padding: 10px 14px;
-  border-radius: 12px;
   font-size: 14px;
   line-height: 1.65;
-  text-align: left;
   word-break: break-word;
   max-width: 100%;
 }
 .message-row.user .message-content {
-  background: var(--el-color-primary, #5a67f5);
-  color: #fff;
-  border-top-right-radius: 4px;
-}
-.message-row.assistant .message-content {
-  background: var(--theme-card-bg, #fff);
+  display: inline-block;
+  padding: 9px 14px;
+  border-radius: 16px;
+  background: var(--fill-light, #f0f2f5);
   color: var(--text-primary, #303133);
-  border: 1px solid var(--border-light, #ebeef5);
-  border-top-left-radius: 4px;
+  max-width: 78%;
+}
+.message-row.is-pending .message-content {
+  opacity: 0.75;
 }
 
 /* 消息操作 */
@@ -1489,19 +1182,24 @@ onBeforeUnmount(() => {
 .msg-action-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 24px;
+  gap: 3px;
+  width: auto;
   height: 24px;
+  padding: 0 6px;
   border: none;
   border-radius: 5px;
   background: transparent;
   color: var(--text-secondary, #909399);
   cursor: pointer;
   transition: all 0.15s;
+  font-size: 12px;
 }
 .msg-action-btn:hover {
   background: var(--fill-hover, #f5f7fa);
   color: var(--el-color-primary, #5a67f5);
+}
+.withdraw-btn:hover {
+  color: var(--el-color-danger, #f56c6c);
 }
 
 /* Markdown styling inside assistant messages */
@@ -1654,28 +1352,91 @@ onBeforeUnmount(() => {
   30% { transform: translateY(-6px); opacity: 1; }
 }
 
-/* Input area */
-.chat-input-area {
-  padding: 12px 16px 16px;
-  background: var(--theme-card-bg, #fff);
-  border-top: 1px solid var(--border-light, #ebeef5);
+/* Input area（qm 式大圆角卡片 composer） */
+.composer-area {
   flex-shrink: 0;
+  padding: 4px 16px max(14px, calc(10px + env(safe-area-inset-bottom)));
 }
-.chat-input-wrapper {
-  max-width: 860px;
+.queue-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 760px;
+  margin: 0 auto 8px;
+  font-size: 12px;
+  color: var(--el-color-warning, #e6a23c);
+}
+.composer-wrap {
+  --composer-radius: 18px;
+  max-width: 760px;
   margin: 0 auto;
+  padding: 10px 12px 8px;
+  background: var(--theme-card-bg, #fff);
+  border: 1px solid var(--border-light, #ebeef5);
+  border-radius: var(--composer-radius);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.input-actions {
+.composer-wrap:focus-within {
+  border-color: var(--el-color-primary-light-5, #b3bcfc);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(90, 103, 245, 0.12);
+}
+.composer-wrap :deep(.el-textarea__inner) {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 6px 6px 4px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-primary, #303133);
+}
+.composer-wrap :deep(.el-textarea__inner)::placeholder {
+  color: var(--text-secondary, #a8abb2);
+}
+.composer-wrap :deep(.el-textarea__inner):focus {
+  border: none;
+  box-shadow: none;
+}
+.generating-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--el-color-success, #67c23a);
+  padding: 2px 6px 8px;
+}
+.stop-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--el-color-danger, #f56c6c);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+.stop-inline:hover {
+  background: var(--el-color-danger-light-9, #fef0f0);
+}
+.composer-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
-  gap: 8px;
+  gap: 10px;
+  margin-top: 6px;
 }
-.input-actions-left {
+.composer-left {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 10px;
+  min-width: 0;
 }
 .tools-toggle {
   display: flex;
@@ -1685,81 +1446,46 @@ onBeforeUnmount(() => {
   color: var(--text-secondary, #909399);
   cursor: default;
 }
-.input-actions-right {
+.char-count {
+  font-size: 11px;
+  color: var(--text-secondary, #c0c4cc);
+}
+.composer-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
-/* 透明无边框下拉（供应商/模型收纳进 composer） */
-.ghost-select {
-  width: auto;
-}
-.provider-ghost {
-  max-width: 150px;
-}
-.model-ghost {
-  max-width: 170px;
-}
-.ghost-select :deep(.el-select__wrapper) {
-  background: transparent;
-  box-shadow: none;
-  border: none;
-  padding: 0 6px;
-  min-height: 26px;
-}
-.ghost-select :deep(.el-select__wrapper:hover) {
-  background: var(--fill-hover, #f5f7fa);
-}
-.ghost-select :deep(.el-select__selected-item) {
-  font-size: 12px;
-  color: var(--text-secondary, #909399);
-}
-/* composer 图标按钮（清空） */
-.composer-icon-btn {
+/* 34×34 方形图标按钮（qm 式 send / stop） */
+.send-square,
+.stop-square {
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  margin-left: 6px;
   border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary, #909399);
+  border-radius: 10px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.12s ease, opacity 0.12s ease;
 }
-.composer-icon-btn:hover {
-  background: var(--fill-hover, #f5f7fa);
+.send-square {
+  background: var(--el-color-primary, #5a67f5);
+  color: #fff;
+}
+.send-square:hover:not(:disabled) {
+  background: var(--el-color-primary-light-3, #7f88f7);
+}
+.send-square:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.stop-square {
+  background: transparent;
+  border: 1px solid var(--border-light, #dcdfe6);
   color: var(--el-color-danger, #f56c6c);
 }
-/* 圆形发送/停止按钮 */
-.send-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--el-color-primary, #5a67f5), #47d8ff);
-  color: #fff;
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
-  box-shadow: 0 2px 8px rgba(90, 103, 245, 0.25);
-}
-.send-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(90, 103, 245, 0.35);
-}
-.send-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-.send-btn.stop {
-  background: linear-gradient(135deg, #f56c6c, #f89898);
-  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.25);
+.stop-square:hover {
+  background: var(--el-color-danger-light-9, #fef0f0);
 }
 
 /* ========== 移动端适配（≤991px） ========== */
@@ -1777,34 +1503,28 @@ onBeforeUnmount(() => {
     box-shadow: 4px 0 16px rgba(0, 0, 0, 0.08);
     transform: translateX(0);
   }
-  .provider-ghost {
-    max-width: 96px;
+  .composer-right .provider-select {
+    width: 96px;
   }
-  .model-ghost {
-    max-width: 112px;
+  .composer-right .model-select {
+    width: 108px;
   }
   .chat-messages {
-    padding: 14px;
+    padding: 14px 10px;
   }
   .message-row {
-    gap: 8px;
-    margin-bottom: 14px;
+    padding-bottom: 10px;
   }
-  .message-avatar {
-    width: 28px;
-    height: 28px;
-  }
-  .message-content {
-    font-size: 13.5px;
-    padding: 9px 12px;
+  .message-row.user .message-content {
+    max-width: 88%;
   }
   .welcome-suggestions {
     grid-template-columns: 1fr;
     width: 100%;
     max-width: 340px;
   }
-  .chat-input-area {
-    padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  .composer-area {
+    padding: 2px 10px calc(10px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -1842,13 +1562,6 @@ html.dark .session-item.active {
   background: rgba(127, 138, 248, 0.15);
   color: #7f8af8;
 }
-html.dark .chat-header {
-  background: #232838;
-  border-bottom-color: #36394a;
-}
-html.dark .chat-title {
-  color: #e6e8f0;
-}
 html.dark .chat-welcome h3 {
   color: #e6e8f0;
 }
@@ -1863,10 +1576,26 @@ html.dark .suggestion-item:hover {
   border-color: #7f8af8;
   background: rgba(127, 138, 248, 0.06);
 }
-html.dark .message-row.assistant .message-content {
-  background: #232838;
+html.dark .message-row.user .message-content {
+  background: #2e3344;
   color: #e6e8f0;
+}
+html.dark .message-row.assistant .message-content {
+  background: transparent;
+  color: #e6e8f0;
+  border: none;
+}
+html.dark .composer-wrap {
+  background: #232838;
   border-color: #36394a;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+html.dark .composer-wrap :deep(.el-textarea__inner) {
+  background: transparent;
+  color: #e6e8f0;
+}
+html.dark .composer-wrap :deep(.el-textarea__inner)::placeholder {
+  color: #6b7089;
 }
 html.dark .message-row.assistant .markdown-body code {
   background: #2e3344;
@@ -1893,36 +1622,41 @@ html.dark .typing-indicator {
 html.dark .typing-indicator span {
   background: #6b7089;
 }
-html.dark .chat-input-area {
-  background: #232838;
-  border-top-color: #36394a;
-}
-html.dark .chat-input-area .el-textarea__inner {
-  background: #2e3344;
+html.dark .composer-area .el-textarea__inner {
+  background: transparent;
   border-color: #3a3f52;
   color: #e6e8f0;
 }
-html.dark .chat-input-area .el-textarea__inner::placeholder {
+html.dark .composer-area .el-textarea__inner::placeholder {
   color: #6b7089;
 }
 html.dark .msg-action-btn:hover {
   background: rgba(127, 138, 248, 0.1);
   color: #7f8af8;
 }
-html.dark .session-item-sub {
-  color: #6b7089;
+html.dark .generating-tip {
+  background: rgba(103, 194, 58, 0.1);
 }
-html.dark .generating-pill {
-  background: rgba(127, 138, 248, 0.15);
-  color: #9aa3ff;
+html.dark .generating-tip.queued-tip {
+  background: rgba(230, 162, 60, 0.1);
 }
-html.dark .ghost-select .el-select__wrapper:hover {
+html.dark .running-badge {
+  background: rgba(103, 194, 58, 0.12);
+}
+html.dark .queue-tag {
+  background: rgba(103, 194, 58, 0.12);
+}
+html.dark .queue-tag.queued {
+  background: rgba(230, 162, 60, 0.12);
+}
+html.dark .toolbar-sep {
+  background: #3a3f52;
+}
+html.dark .toolbar-icon-btn:hover {
   background: rgba(127, 138, 248, 0.1);
+  color: #7f8af8;
 }
-html.dark .ghost-select .el-select__selected-item {
-  color: #9aa0b5;
-}
-html.dark .composer-icon-btn:hover {
-  background: rgba(127, 138, 248, 0.1);
+html.dark .composer-right :deep(.el-select__wrapper):hover {
+  background: #2e3344;
 }
 </style>
