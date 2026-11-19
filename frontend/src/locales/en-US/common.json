@@ -118,7 +118,12 @@
     "waitingRestartAttempt": "Waiting for backend to restart... ({attempt}/{max})",
     "backendRecovered": "Backend recovered, refreshing page...",
     "backendTimeout": "Backend restart timed out, please refresh the page manually",
-    "uploadFailed": "Upload failed, please retry"
+    "uploadFailed": "Upload failed, please retry",
+    "availablePrefix": "New version available",
+    "availableBanner": "New version v{version} detected. Download the official package and update with one click.",
+    "oneClickUpdate": "Download & update",
+    "downloading": "Downloading package…",
+    "downloadFailed": "Failed to download the package. Check your network and retry, or upload manually."
   },
   "error": {
     "notFoundTitle": "Page not found or access denied",

@@ -84,3 +84,6 @@ log:
   output: stdout            # stdout | file
   file_path: "logs/app.log"
   op_log_queue_size: 1024   # 操作日志缓冲队列容量（0 = 同步写）
+
+apehub:
+  base_url: "https://apehub.finecv.cn"   # 官网地址（版本检查 / 一键下载更新包）

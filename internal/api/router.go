@@ -138,6 +138,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		version := perm.Group("/system")
 		verH := &VersionHandler{}
 		version.GET("/version", middleware.RequirePermission("system:setting:list"), verH.GetVersion)
+		version.GET("/check-update", middleware.RequirePermission("system:setting:list"), verH.CheckUpdate)
 		version.POST("/update", middleware.RequirePermission("system:setting:edit"), verH.Update)
 
 		// 多语言管理

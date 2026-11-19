@@ -66,8 +66,15 @@
           </li>
 
           <!-- Version update (replaces bookmark) -->
-          <li v-if="!isMobile || windowWidth > 575" class="icon-item version-update-btn" @click="versionUpdateVisible = true">
+          <li
+            v-if="canViewVersion && (!isMobile || windowWidth > 575)"
+            class="icon-item version-update-btn"
+            :class="{ 'has-update': hasNewVersion }"
+            :title="hasNewVersion ? `${t('common.versionUpdate.availablePrefix')} v${latestVersionLabel}` : ''"
+            @click="versionUpdateVisible = true"
+          >
             <el-icon :size="18"><RefreshRight /></el-icon>
+            <span v-if="hasNewVersion" class="update-dot"></span>
           </li>
 
           <!-- Notifications -->
@@ -148,6 +155,25 @@ const { t, locale } = useI18n()
 
 const keyword = ref('')
 const versionUpdateVisible = ref(false)
+// 仅对有版本查看权限的用户展示入口（无权限时弹窗只会是 403 / 空数据）
+const canViewVersion = computed(() => userStore.hasPermission('system:setting:list'))
+// 有新版本红点：挂载时静默探测一次（失败静默）
+const hasNewVersion = ref(false)
+const latestVersionLabel = ref('')
+
+async function probeUpdate() {
+  if (!canViewVersion.value) return
+  try {
+    const { checkSystemUpdate } = await import('@/api')
+    const res: any = await checkSystemUpdate()
+    if (res?.reachable && res?.has_update) {
+      hasNewVersion.value = true
+      latestVersionLabel.value = res.latest_version || ''
+    }
+  } catch {
+    /* 离线 / 旧后端：保持静默 */
+  }
+}
 const notifVisible = ref(false)
 const msgVisible = ref(false)
 const profileVisible = ref(false)
@@ -176,6 +202,7 @@ function handleClickOutside(e: MouseEvent) {
 onMounted(() => {
   window.addEventListener('resize', () => { windowWidth.value = window.innerWidth })
   document.addEventListener('click', handleClickOutside)
+  if (canViewVersion.value) probeUpdate()
 })
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
@@ -449,6 +476,21 @@ async function handleLogout() {
 .icon-item:hover {
   background: #eff3f9;
   color: var(--theme-default, #5A67F5);
+}
+
+/* 版本更新入口：有新版本时右上角红点 */
+.version-update-btn.has-update {
+  color: var(--theme-default, #5A67F5);
+}
+.update-dot {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--el-color-danger, #f56c6c);
+  box-shadow: 0 0 0 2px var(--theme-card-bg, #fff);
 }
 
 /* Language */

@@ -118,7 +118,12 @@
     "waitingRestartAttempt": "等待后端重启完成... ({attempt}/{max})",
     "backendRecovered": "后端已恢复，正在刷新页面...",
     "backendTimeout": "后端重启超时，请手动刷新页面",
-    "uploadFailed": "上传失败，请重试"
+    "uploadFailed": "上传失败，请重试",
+    "availablePrefix": "有新版本",
+    "availableBanner": "检测到新版本 v{version}，可一键下载官方安装包并更新",
+    "oneClickUpdate": "一键下载并更新",
+    "downloading": "下载安装包中…",
+    "downloadFailed": "下载安装包失败，请检查网络后重试，或手动上传"
   },
   "error": {
     "notFoundTitle": "页面不存在或无权限访问",

@@ -21,6 +21,12 @@ type Config struct {
 	Pagination PaginationConfig `mapstructure:"pagination"`
 	Security   SecurityConfig   `mapstructure:"security"`
 	Log        LogConfig        `mapstructure:"log"`
+	ApeHub     ApeHubConfig     `mapstructure:"apehub"`
+}
+
+// ApeHubConfig ApeHub 官网地址（版本检查 / 一键下载更新包）
+type ApeHubConfig struct {
+	BaseURL string `mapstructure:"base_url"`
 }
 
 type AppConfig struct {

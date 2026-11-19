@@ -2,12 +2,13 @@ package api
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -68,6 +69,109 @@ func (h *VersionHandler) GetVersion(c *gin.Context) {
 		"arch":            runtime.GOARCH,
 		"pid":             os.Getpid(),
 	}))
+}
+
+// CheckUpdate GET /system/check-update
+// 对比当前版本与 ApeHub 最新 Go 版发布；网络失败静默降级（reachable=false）。
+func (h *VersionHandler) CheckUpdate(c *gin.Context) {
+	cfg := core.GetConfig()
+	current := "unknown"
+	base := "https://apehub.finecv.cn"
+	if cfg != nil {
+		if cfg.App.Version != "" {
+			current = cfg.App.Version
+		}
+		if cfg.ApeHub.BaseURL != "" {
+			base = cfg.ApeHub.BaseURL
+		}
+	}
+	base = strings.TrimRight(base, "/")
+
+	result := gin.H{
+		"current_version": current,
+		"reachable":       false,
+		"has_update":      false,
+	}
+
+	client := &http.Client{Timeout: 6 * time.Second}
+	feedURL := base + "/api/v1/apehub-web/site/public/releases?framework=go"
+	resp, err := client.Get(feedURL)
+	if err != nil {
+		c.JSON(http.StatusOK, response.Success(result))
+		return
+	}
+	defer resp.Body.Close()
+
+	var body struct {
+		Data struct {
+			Items []struct {
+				ID          int    `json:"id"`
+				Version     string `json:"version"`
+				Title       string `json:"title"`
+				Description string `json:"description"`
+				Changelog   string `json:"changelog"`
+				PublishedAt string `json:"published_at"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&body) != nil || len(body.Data.Items) == 0 {
+		c.JSON(http.StatusOK, response.Success(result))
+		return
+	}
+
+	latest := body.Data.Items[0]
+	result["reachable"] = true
+	result["latest_version"] = latest.Version
+	result["release_id"] = latest.ID
+	result["title"] = latest.Title
+	result["changelog"] = latest.Changelog
+	result["published_at"] = latest.PublishedAt
+	result["download_url"] = fmt.Sprintf("%s/api/v1/apehub-web/site/public/releases/%d/download", base, latest.ID)
+	result["has_update"] = semverGreater(latest.Version, current)
+	c.JSON(http.StatusOK, response.Success(result))
+}
+
+// parseSemver "0.4.1" -> [0,4,1]（非数字段忽略）
+func parseSemver(v string) []int {
+	parts := make([]int, 0, 3)
+	for _, seg := range strings.Split(strings.TrimLeft(strings.TrimSpace(v), "vV"), ".") {
+		var digits strings.Builder
+		for _, ch := range seg {
+			if ch >= '0' && ch <= '9' {
+				digits.WriteRune(ch)
+			}
+		}
+		if digits.Len() > 0 {
+			n, _ := strconv.Atoi(digits.String())
+			parts = append(parts, n)
+		}
+	}
+	if len(parts) == 0 {
+		return []int{0}
+	}
+	return parts
+}
+
+// semverGreater a 是否高于 b（逐段比较，缺失段按 0 处理）
+func semverGreater(a, b string) bool {
+	pa, pb := parseSemver(a), parseSemver(b)
+	n := len(pa)
+	if len(pb) > n {
+		n = len(pb)
+	}
+	for i := 0; i < n; i++ {
+		va, vb := 0, 0
+		if i < len(pa) {
+			va = pa[i]
+		}
+		if i < len(pb) {
+			vb = pb[i]
+		}
+		if va != vb {
+			return va > vb
+		}
+	}
+	return false
 }
 
 // Update POST /system/update —— 上传 ZIP 部署包并执行原地替换
