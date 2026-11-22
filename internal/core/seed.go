@@ -381,7 +381,7 @@ func seedSettings(db *gorm.DB) {
 
 	// is_public 与 Python 版对齐：后台访问路径/侧边栏主题为私密项，不通过公共接口暴露
 	settings := []model.SysSetting{
-		{Key: "site_name", Value: "ApeAdmin-Gin", IsPublic: true},
+		{Key: "site_name", Value: "ApeAdmin", IsPublic: true},
 		{Key: "logo_url", Value: "", IsPublic: true},
 		{Key: "primary_color", Value: "#5A67F5", IsPublic: true},
 		{Key: "admin_path", Value: "/admin", IsPublic: false},

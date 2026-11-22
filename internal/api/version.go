@@ -51,7 +51,7 @@ type VersionHandler struct{}
 func (h *VersionHandler) GetVersion(c *gin.Context) {
 	cfg := core.GetConfig()
 	version := "unknown"
-	appName := "ApeAdmin-Gin"
+	appName := "ApeAdmin"
 	if cfg != nil {
 		if cfg.App.Version != "" {
 			version = cfg.App.Version
@@ -394,7 +394,7 @@ func locatePayload(stage string) (spaDir string, binDir string, version string, 
 	if spa, bin, ver, ok := probe(rp); ok {
 		return spa, bin, ver, nil
 	}
-	return "", "", "", fmt.Errorf("包内未找到 frontend/dist 目录，请确认上传的是 ApeAdmin-Gin 官方 ZIP 部署包")
+	return "", "", "", fmt.Errorf("包内未找到 frontend/dist 目录，请确认上传的是 ApeAdmin 官方 ZIP 部署包")
 }
 
 // readVersionFromConfig 从 config.yaml 提取 version 字段（轻量解析，避免引入 viper 依赖）

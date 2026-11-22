@@ -2,7 +2,7 @@
 # 环境变量覆盖示例：GA_DATABASE_TYPE=mysql 覆盖 database.type
 
 app:
-  name: "ApeAdmin-Gin"
+  name: "ApeAdmin"
   version: "0.4.1"
   debug: true
   api_prefix: "/api/v1"
