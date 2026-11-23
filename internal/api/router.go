@@ -21,6 +21,17 @@ type PluginRouteRegistrar func(public, authed *gin.RouterGroup)
 func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRouteRegistrar) {
 	r.GET("/health", HealthCheck)
 
+	// OAuth 发现元数据（根路径，RFC 8414 / RFC 9728）
+	r.GET("/.well-known/oauth-protected-resource", OAuthWellKnownProtectedResource)
+	r.GET("/.well-known/oauth-authorization-server", OAuthWellKnownAuthorizationServer)
+
+	// MCP 对外网关（Streamable HTTP：外部 MCP 客户端经 OAuth/登录 token 接入）
+	mcpGw := &McpHandler{}
+	mcpAuth := middleware.MCPAuth()
+	r.POST("/mcp", mcpAuth, middleware.RateLimit("mcp", 120, time.Minute), mcpGw.MCPGateway)
+	r.GET("/mcp", mcpAuth, mcpGw.MCPGateway)
+	r.DELETE("/mcp", mcpAuth, mcpGw.MCPGateway)
+
 	// 语言解析（全局，后端消息翻译用）
 	r.Use(middleware.Locale())
 
@@ -46,6 +57,13 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		public.GET("/health", HealthCheck)
 		// token 刷新：必须免登录（access 过期后才能换新，放 authed 组会死锁）
 		public.POST("/auth/refresh", (&AuthHandler{}).RefreshToken)
+
+		// OAuth 授权服务器（外部 MCP 客户端接入；根路径 well-known 见文件头部注册）
+		oauth := public.Group("/oauth")
+		oauth.POST("/register", middleware.RateLimit("oauth-register", 5, time.Minute), OAuthRegister)
+		oauth.GET("/authorize", OAuthAuthorize)
+		oauth.POST("/authorize/consent", middleware.RateLimit("oauth-consent", 10, time.Minute), OAuthAuthorizeConsent)
+		oauth.POST("/token", middleware.RateLimit("oauth-token", 30, time.Minute), OAuthToken)
 
 		// i18n 公开接口（登录页/前端启动即用）
 		i18nPub := public.Group("/i18n")

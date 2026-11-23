@@ -322,10 +322,19 @@ func T(locale, key string, params ...map[string]string) string {
 		if dict, ok := builtinMessages[locale]; ok {
 			msg = dict[key]
 		}
-		// 回退默认语言（zh-CN）
-		if msg == "" && locale != "zh-CN" {
-			if dict, ok := builtinMessages["zh-CN"]; ok {
-				msg = dict[key]
+		// 回退默认语言（zh-CN）：DB 覆盖层与内置字典都参与回退
+		if msg == "" && locale != i18nS.defaultLocale {
+			i18nS.mu.RLock()
+			if ov, ok := i18nS.overrides[i18nS.defaultLocale]; ok {
+				if v, ok := ov[key]; ok {
+					msg = v
+				}
+			}
+			i18nS.mu.RUnlock()
+			if msg == "" {
+				if dict, ok := builtinMessages[i18nS.defaultLocale]; ok {
+					msg = dict[key]
+				}
 			}
 		}
 	}

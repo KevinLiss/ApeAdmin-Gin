@@ -44,6 +44,9 @@ var allModels = []interface{}{
 	&model.SysChatSession{},
 	&model.SysChatMessage{},
 	&model.SysChatRun{},
+	&model.SysOAuthClient{},
+	&model.SysOAuthCode{},
+	&model.SysOAuthRefreshToken{},
 	&model.SysLocale{},
 	&model.SysTranslation{},
 }
@@ -79,15 +82,28 @@ func Run(configPath string) error {
 	core.LoadI18nFromDB(db)
 
 	// 5. （已在 4.5 注入容器）
-	// 6. TokenStore（步骤编号沿用）
-	tokenStore := core.NewMemoryTokenStore()
+	// 5.5 Redis（可选，多实例共享层：token 黑名单 / 权限缓存）
+	if err := core.InitRedis(cfg); err != nil {
+		log.Printf("Redis 初始化失败，回退单实例内存模式: %v", err)
+	} else if core.RedisEnabled() {
+		log.Printf("Redis 已启用（多实例模式）")
+	}
+
+	// 6. TokenStore（多实例时用 Redis 黑名单，单实例内存）
+	var tokenStore core.TokenStore
+	if core.RedisEnabled() {
+		tokenStore = core.NewRedisTokenStore(core.GetRedis())
+		log.Printf("token 黑名单：Redis 模式（多实例共享）")
+	} else {
+		tokenStore = core.NewMemoryTokenStore()
+		// 后台定期清理过期黑名单条目（IsRevoked 有惰性清理，此处兜底批量回收）
+		go func() {
+			for range time.Tick(30 * time.Minute) {
+				tokenStore.(*core.MemoryTokenStore).CleanupExpired()
+			}
+		}()
+	}
 	core.SetTokenStore(tokenStore)
-	// 后台定期清理过期黑名单条目（IsRevoked 有惰性清理，此处兜底批量回收）
-	go func() {
-		for range time.Tick(30 * time.Minute) {
-			tokenStore.CleanupExpired()
-		}
-	}()
 
 	// 7. JWT 配置
 	core.SetJWTConfig(&cfg.JWT)
@@ -98,10 +114,14 @@ func Run(configPath string) error {
 	// 8.5 从数据库读运行时 admin_path 覆盖 config（系统设置里修改后台路径 + 重启后生效）
 	applyRuntimeAdminPath(cfg)
 
-	// 8.6 回收上次进程遗留的对话 run（worker 已不在内存，标记失败请用户重发）
+	// 8.6 回收上次进程遗留的对话 run（无主或心跳超时的才回收，多实例安全）
 	if n := api.RecoverChatRuns(); n > 0 {
 		log.Printf("已回收 %d 个中断的 AI 对话 run", n)
 	}
+
+	// 8.7 全局 run 领取器：多实例部署时兜底接管其他实例入队的任务（幂等，单实例也安全）
+	ctxRun := context.Background()
+	api.StartRunClaimer(ctxRun)
 
 	// 9. 操作日志队列
 	auditQueue := core.NewAuditQueue(db, cfg.Log.OpLogQueueSize)
@@ -211,8 +231,9 @@ func runServer(r *gin.Engine, port int, deps *shutdownCtx) error {
 	if deps.auditQueue != nil {
 		deps.auditQueue.Shutdown(ctx2)
 	}
-	// 取消所有对话 run worker（限时等待，未写完的 run 下次启动时回收）
+	// 取消所有对话 run worker（限时等待；pending 释放领取标记，其他实例可接管）
 	api.ShutdownChatRuns(3 * time.Second)
+	core.CloseRedis()
 	if deps.db != nil {
 		if sqlDB, err := deps.db.DB(); err == nil {
 			_ = sqlDB.Close()

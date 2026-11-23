@@ -22,7 +22,7 @@ database:
   log_level: warn           # silent | error | warn | info
   auto_migrate: true        # 仅开发/首启用；生产必须 false 并走 golang-migrate（见 14.5）
 
-redis:
+redis:                        # 多实例部署的共享层（token 黑名单/权限缓存）；单实例可保持关闭
   url: "redis://localhost:6379/1"
   enabled: false            # 默认关闭，按需开启
 

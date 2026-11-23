@@ -126,8 +126,9 @@ func (h *AiHandler) ChatRunEvents(c *gin.Context) {
 
 	buf := getRunBuffer(run.ID)
 	if buf == nil {
-		// 无实时缓冲（进程重启/终态缓冲已回收）：回放落库状态后结束
-		send(runStateFromModel(&run))
+		// 本机无实时缓冲：跨实例场景（run 被其他实例执行）或缓冲已回收。
+		// 降级为轮询模式：从落库状态推流（answer 增量 + 状态/工具事件变化推送）。
+		streamRunEventsByPolling(c, flusher, send, &run)
 		return
 	}
 
@@ -228,4 +229,79 @@ func (h *AiHandler) ActiveChatRun(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response.Success(getActiveChatRunState(uint(sessionID64), userID)))
+}
+// streamRunEventsByPolling 跨实例订阅降级：本机无 RunBuffer 时按落库状态推流。
+// 语义与缓冲模式一致（snapshot / run_start / content / run_end），供前端同一套处理。
+func streamRunEventsByPolling(c *gin.Context, flusher http.Flusher, send func(interface{}), run *model.SysChatRun) {
+	db := core.GetDB()
+	// 初始快照（以 DB 为准）
+	state := runStateFromModel(run)
+	state["question"] = run.Question
+	send(state)
+
+	lastAnswer := run.Answer
+	lastStatus := run.Status
+	lastEvents := run.ToolEvents
+	lastBeat := time.Now()
+	ctx := c.Request.Context()
+	ticker := time.NewTicker(800 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		var cur model.SysChatRun
+		if err := db.First(&cur, run.ID).Error; err != nil {
+			return // run 被删除（会话删除）
+		}
+
+		// 心跳（20s 无事件时发注释行，防止代理断连）
+		if time.Since(lastBeat) > 20*time.Second {
+			fmt.Fprint(c.Writer, ": keep-alive\n\n")
+			flusher.Flush()
+			lastBeat = time.Now()
+		}
+
+		// answer 增量
+		if len(cur.Answer) > len(lastAnswer) && strings.HasPrefix(cur.Answer, lastAnswer) {
+			delta := cur.Answer[len(lastAnswer):]
+			send(map[string]interface{}{"type": "content", "content": delta})
+			lastAnswer = cur.Answer
+			lastBeat = time.Now()
+		} else if cur.Answer != lastAnswer {
+			// 非前缀变化（重写/截断）→ 全量对齐
+			send(map[string]interface{}{
+				"type": "snapshot", "run_id": cur.ID, "session_id": cur.SessionID,
+				"status": cur.Status, "answer": cur.Answer, "error": cur.Error,
+			})
+			lastAnswer = cur.Answer
+			lastBeat = time.Now()
+		}
+
+		// 工具事件变化 → 全量对齐
+		if cur.ToolEvents != lastEvents {
+			send(map[string]interface{}{
+				"type": "snapshot", "run_id": cur.ID, "session_id": cur.SessionID,
+				"status": cur.Status, "answer": cur.Answer, "error": cur.Error,
+			})
+			lastEvents = cur.ToolEvents
+			lastBeat = time.Now()
+		}
+
+		// 状态迁移
+		if cur.Status != lastStatus {
+			if lastStatus == "pending" && cur.Status == "running" {
+				send(map[string]interface{}{"type": "run_start", "status": "running"})
+			}
+			if runTerminalStatuses[cur.Status] {
+				send(map[string]interface{}{"type": "run_end", "status": cur.Status, "error": cur.Error})
+				return
+			}
+			lastStatus = cur.Status
+			lastBeat = time.Now()
+		}
+	}
 }

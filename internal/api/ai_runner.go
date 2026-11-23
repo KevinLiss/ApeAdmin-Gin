@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -30,9 +31,19 @@ const (
 	runContextWindow   = 40                     // 发送给 LLM 的最大历史条数
 	runBufferTTL       = 10 * time.Minute       // 终态缓冲保留时长（供迟到订阅者取快照）
 	runMaxToolRounds   = 5                      // 工具循环上限
+
+	runClaimStale   = 90 * time.Second // 领取心跳超时阈值：超过视为执行实例已死
+	runHeartbeat    = 15 * time.Second // 执行中心跳间隔
+	runClaimerEvery = 500 * time.Millisecond // 全局领取器扫描间隔
 )
 
 var runTerminalStatuses = map[string]bool{"done": true, "failed": true, "stopped": true}
+
+// runInstanceID 本实例标识（多实例部署下标识 run 归属；单实例恒为本机）
+var runInstanceID = func() string {
+	host, _ := os.Hostname()
+	return fmt.Sprintf("%s-%d-%d", host, os.Getpid(), time.Now().UnixNano()%100000)
+}()
 
 // ────────────────────────── 内存状态 ──────────────────────────
 
@@ -154,6 +165,55 @@ func removeRunBuffer(runID uint) {
 
 // ────────────────────────── worker ──────────────────────────
 
+// runClaimStaleAt 心跳超时判定时间点
+func runClaimStaleAt() time.Time {
+	return time.Now().Add(-runClaimStale)
+}
+
+// claimRun 原子抢占：仅当 run 无主/本机持有/心跳超时 且仍为 pending 时成功。
+// 多实例部署下保证同一 run 只被一个实例执行；单实例下恒成功。
+func claimRun(runID uint) bool {
+	res := core.GetDB().Model(&model.SysChatRun{}).
+		Where("id = ? AND status = 'pending' AND (claimed_by = '' OR claimed_by IS NULL OR claimed_by = ? OR claimed_at IS NULL OR claimed_at < ?)",
+			runID, runInstanceID, runClaimStaleAt()).
+		Updates(map[string]interface{}{"claimed_by": runInstanceID, "claimed_at": time.Now()})
+	return res.Error == nil && res.RowsAffected > 0
+}
+
+// releaseClaim 释放本实例持有的 pending 领取标记（优雅停机时调用，其他实例可接管）
+func releaseOwnPendingClaims() {
+	core.GetDB().Model(&model.SysChatRun{}).
+		Where("claimed_by = ? AND status = 'pending'", runInstanceID).
+		Updates(map[string]interface{}{"claimed_by": "", "claimed_at": nil})
+}
+
+// StartRunClaimer 全局领取器：周期扫描未被认领/心跳超时的 pending run 并抢占执行。
+// 多实例部署的兜底接管路径（入队实例的 fast path 是 enqueue→startSessionWorker）。
+func StartRunClaimer(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(runClaimerEvery)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+			var runs []model.SysChatRun
+			core.GetDB().Where("status = 'pending' AND (claimed_by = '' OR claimed_by IS NULL OR claimed_at IS NULL OR claimed_at < ?)",
+				runClaimStaleAt()).Order("id ASC").Limit(10).Find(&runs)
+			for _, r := range runs {
+				if ctx.Err() != nil {
+					return
+				}
+				if claimRun(r.ID) {
+					startSessionWorker(r.SessionID)
+				}
+			}
+		}
+	}()
+}
+
 // startSessionWorker 确保会话有且仅有一个 worker（幂等）
 func startSessionWorker(sessionID uint) {
 	runWorkersMu.Lock()
@@ -168,7 +228,7 @@ func startSessionWorker(sessionID uint) {
 	go sessionWorker(ctx, sessionID)
 }
 
-// sessionWorker 单会话串行执行器：FIFO 消费 pending run
+// sessionWorker 单会话串行执行器：FIFO 消费 pending run（执行前原子抢占）
 func sessionWorker(ctx context.Context, sessionID uint) {
 	defer runWorkersWG.Done()
 	defer func() {
@@ -191,10 +251,17 @@ func sessionWorker(ctx context.Context, sessionID uint) {
 			return
 		}
 		var run model.SysChatRun
-		res := core.GetDB().Where("session_id = ? AND status = ?", sessionID, "pending").
+		res := core.GetDB().
+			Where("session_id = ? AND status = ?", sessionID, "pending").
+			Where("claimed_by = '' OR claimed_by IS NULL OR claimed_by = ? OR claimed_at IS NULL OR claimed_at < ?",
+				runInstanceID, runClaimStaleAt()).
 			Order("id ASC").Limit(1).Find(&run)
 		if res.Error != nil || res.RowsAffected == 0 {
 			return // 无更多排队任务
+		}
+		if !claimRun(run.ID) {
+			// 被其他实例抢先：跳过，继续找下一个
+			continue
 		}
 		if getRunBuffer(run.ID) == nil {
 			// 入队缓冲已丢失（排队中被撤销）：直接落终态
@@ -242,6 +309,24 @@ func executeRun(ctx context.Context, runID uint) {
 	buf.status = "running"
 	buf.mu.Unlock()
 	buf.publish(map[string]interface{}{"type": "run_start", "status": "running"})
+
+	// 领取心跳：执行期间定期刷新 claimed_at；实例崩溃后其他实例可在超时后接管
+	hbStop := make(chan struct{})
+	defer close(hbStop)
+	go func() {
+		ticker := time.NewTicker(runHeartbeat)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-hbStop:
+				return
+			case <-ticker.C:
+				core.GetDB().Model(&model.SysChatRun{}).
+					Where("id = ? AND claimed_by = ?", run.ID, runInstanceID).
+					Update("claimed_at", time.Now())
+			}
+		}
+	}()
 
 	// 用户权限（后台执行无 gin.Context，按 user_id 重算，与流式对话一致）
 	var usr model.SysUser
@@ -620,11 +705,15 @@ func runStateFromModel(run *model.SysChatRun) map[string]interface{} {
 	}
 }
 
-// RecoverChatRuns 启动时把上次进程遗留的 pending/running run 标记失败
+// RecoverChatRuns 启动时回收上次进程遗留的 run（多实例安全）：
+// 仅回收「无主」或「领取心跳超时」的 pending/running；
+// 其他健康实例正在执行的 run（心跳新鲜）不会被误杀。
 func RecoverChatRuns() int {
 	db := core.GetDB()
 	var runs []model.SysChatRun
-	db.Where("status IN ?", []string{"pending", "running"}).Find(&runs)
+	db.Where("status IN ?", []string{"pending", "running"}).
+		Where("claimed_by = '' OR claimed_by IS NULL OR claimed_at IS NULL OR claimed_at < ?",
+			runClaimStaleAt()).Find(&runs)
 	n := 0
 	for i := range runs {
 		errMsg := "服务重启，请重新发送"
@@ -639,7 +728,8 @@ func RecoverChatRuns() int {
 	return n
 }
 
-// ShutdownChatRuns 停机时取消所有 worker 并等待（限时）
+// ShutdownChatRuns 停机时取消所有 worker 并等待（限时）；
+// pending run 释放领取标记，多实例部署下可被其他实例接管。
 func ShutdownChatRuns(timeout time.Duration) {
 	runWorkersMu.Lock()
 	for _, cancel := range runWorkers {
@@ -656,6 +746,8 @@ func ShutdownChatRuns(timeout time.Duration) {
 	case <-done:
 	case <-time.After(timeout):
 	}
+
+	releaseOwnPendingClaims()
 
 	runBuffersMu.Lock()
 	runBuffers = map[uint]*RunBuffer{}

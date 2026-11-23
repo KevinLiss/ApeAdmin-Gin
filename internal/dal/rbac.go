@@ -72,8 +72,8 @@ func GetMenusByRoleID(roleID uint) ([]model.SysMenu, error) {
 	var menus []model.SysMenu
 	err := gormDB.Raw(`
 		SELECT m.* FROM sys_menu m
-		INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
-		WHERE rm.role_id = ? AND m.status = 1
+		INNER JOIN sys_role_menu rm ON rm.sys_menu_id = m.id
+		WHERE rm.sys_role_id = ? AND m.status = 1
 		ORDER BY m.sort ASC
 	`, roleID).Scan(&menus).Error
 	if err != nil {

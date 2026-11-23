@@ -1,9 +1,13 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
+	"apeadmin-gin/internal/core"
 	"apeadmin-gin/internal/dal"
 	"apeadmin-gin/internal/model"
 	"apeadmin-gin/internal/schema"
@@ -34,6 +38,8 @@ var (
 )
 
 // GetUserPermissionsCached 带缓存的用户权限查询（中间件用）
+// 双层缓存：L1 进程内（30s TTL）+ L2 Redis（多实例共享，redis.enabled=true 时生效）。
+// 角色变更时同时失效两层；多实例下 Redis 层保证其他实例即时拿到新权限。
 func GetUserPermissionsCached(userID uint) map[string]bool {
 	permMu.RLock()
 	if e, ok := permCache[userID]; ok && time.Now().Before(e.expiresAt) {
@@ -43,12 +49,57 @@ func GetUserPermissionsCached(userID uint) map[string]bool {
 	}
 	permMu.RUnlock()
 
+	// L2：Redis 命中
+	if perms := permCacheFromRedis(userID); perms != nil {
+		permMu.Lock()
+		permCache[userID] = &permCacheEntry{perms: perms, expiresAt: time.Now().Add(permCacheTTL)}
+		permMu.Unlock()
+		return perms
+	}
+
 	perms := GetUserPermissions(userID)
 
 	permMu.Lock()
 	permCache[userID] = &permCacheEntry{perms: perms, expiresAt: time.Now().Add(permCacheTTL)}
 	permMu.Unlock()
+	permCacheToRedis(userID, perms)
 	return perms
+}
+
+// permCacheFromRedis 读 L2 缓存（未启用/故障返回 nil 走回源）
+func permCacheFromRedis(userID uint) map[string]bool {
+	rdb := core.GetRedis()
+	if rdb == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	data, err := rdb.Get(ctx, permRedisKey(userID)).Bytes()
+	if err != nil {
+		return nil
+	}
+	perms := make(map[string]bool)
+	if err := json.Unmarshal(data, &perms); err != nil {
+		return nil
+	}
+	return perms
+}
+
+// permCacheToRedis 写 L2 缓存（静默失败：缓存只是加速层）
+func permCacheToRedis(userID uint, perms map[string]bool) {
+	rdb := core.GetRedis()
+	if rdb == nil || perms == nil {
+		return
+	}
+	if data, err := json.Marshal(perms); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+		defer cancel()
+		_ = rdb.Set(ctx, permRedisKey(userID), data, permCacheTTL).Err()
+	}
+}
+
+func permRedisKey(userID uint) string {
+	return fmt.Sprintf("apeadmin:perm:%d", userID)
 }
 
 // InvalidateUserPermCache 失效单个用户的权限缓存
@@ -57,14 +108,39 @@ func InvalidateUserPermCache(userID uint) {
 	permMu.Lock()
 	delete(permCache, userID)
 	permMu.Unlock()
+	if rdb := core.GetRedis(); rdb != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+		defer cancel()
+		_ = rdb.Del(ctx, permRedisKey(userID)).Err()
+	}
 }
 
 // InvalidateAllPermCache 全量失效
-// （角色变更影响该角色下所有用户，无法精确列举，整体清空最安全）
+// （角色变更影响该角色下所有用户，无法精确列举；L1 整体清空 + L2 扫描删除）
 func InvalidateAllPermCache() {
 	permMu.Lock()
 	permCache = make(map[uint]*permCacheEntry)
 	permMu.Unlock()
+	if rdb := core.GetRedis(); rdb != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		var keys []string
+		var cursor uint64
+		for {
+			page, next, err := rdb.Scan(ctx, cursor, "apeadmin:perm:*", 1000).Result()
+			if err != nil {
+				break
+			}
+			keys = append(keys, page...)
+			cursor = next
+			if cursor == 0 {
+				break
+			}
+		}
+		if len(keys) > 0 {
+			_ = rdb.Del(ctx, keys...).Err()
+		}
+	}
 }
 
 // ────────────────────────────────────────────────────────────────────────────

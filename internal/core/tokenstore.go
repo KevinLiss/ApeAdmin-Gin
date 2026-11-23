@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // TokenStore 接口化：单实例内存实现，多实例 Redis 实现
@@ -58,4 +60,33 @@ func (s *MemoryTokenStore) CleanupExpired() {
 			delete(s.revoked, jti)
 		}
 	}
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// RedisTokenStore 多实例实现（redis.enabled=true 时由 bootstrap 装配）
+// 黑名单全局共享：任一实例登出/改密，所有实例立即失效该 token。
+// ────────────────────────────────────────────────────────────────────────────
+
+type RedisTokenStore struct {
+	client *redis.Client
+}
+
+func NewRedisTokenStore(client *redis.Client) *RedisTokenStore {
+	return &RedisTokenStore{client: client}
+}
+
+func (s *RedisTokenStore) Revoke(ctx context.Context, jti string, ttl time.Duration) error {
+	if ttl <= 0 {
+		ttl = time.Hour
+	}
+	return s.client.Set(ctx, "token:revoked:"+jti, "1", ttl).Err()
+}
+
+func (s *RedisTokenStore) IsRevoked(ctx context.Context, jti string) (bool, error) {
+	n, err := s.client.Exists(ctx, "token:revoked:"+jti).Result()
+	if err != nil {
+		// Redis 故障时 fail-open：可用性优先（与内存实现语义一致的最差情况是未吊销）
+		return false, err
+	}
+	return n > 0, nil
 }

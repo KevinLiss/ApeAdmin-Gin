@@ -21,6 +21,9 @@ type SysChatRun struct {
 	Error       string     `gorm:"type:text" json:"error"`
 	StartedAt   *time.Time `json:"started_at"`
 	FinishedAt  *time.Time `json:"finished_at"`
+	// 多实例支持：执行实例标识 + 领取心跳（单实例下恒为本实例，行为不变）
+	ClaimedBy string     `gorm:"size:64;index" json:"claimed_by"`
+	ClaimedAt *time.Time `json:"claimed_at"`
 }
 
 func (SysChatRun) TableName() string { return "sys_chat_run" }
