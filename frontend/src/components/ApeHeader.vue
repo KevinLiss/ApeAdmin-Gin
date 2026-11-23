@@ -47,13 +47,13 @@
         <ul class="nav-menus">
           <!-- Language switcher -->
           <li class="icon-item lang-item" @click="langVisible = !langVisible">
-            <span class="flag-icon" :class="currentLocaleFlag"></span>
+            <span class="fi" :class="currentLocaleFlag"></span>
             <span class="lang-txt">{{ currentLocaleLabel }}</span>
             <el-icon :size="12"><ArrowDown /></el-icon>
             <ul v-if="langVisible" class="profile-dropdown lang-dropdown">
               <li v-for="l in localeOptions" :key="l.code">
                 <a :class="{ active: l.code === currentLocale }" @click="switchLanguage(l.code)">
-                  <span class="flag-icon" :class="l.flag"></span>
+                  <span class="fi" :class="l.flag"></span>
                   <span>{{ l.label }}</span>
                 </a>
               </li>
@@ -210,13 +210,13 @@ onUnmounted(() => {
 
 // ===== 语言切换 =====
 const localeOptions = computed(() =>
-  SUPPORTED_LOCALES.map((l) => ({ code: l.code, label: l.label, flag: l.code === 'zh-CN' ? 'flag-cn' : 'flag-us' }))
+  SUPPORTED_LOCALES.map((l) => ({ code: l.code, label: l.label, flag: l.code === 'zh-CN' ? 'fi-cn' : 'fi-us' }))
 )
 const currentLocale = computed(() => locale.value)
 const currentLocaleLabel = computed(
   () => localeOptions.value.find((l) => l.code === currentLocale.value)?.label || '简体中文'
 )
-const currentLocaleFlag = computed(() => (currentLocale.value === 'zh-CN' ? 'flag-cn' : 'flag-us'))
+const currentLocaleFlag = computed(() => (currentLocale.value === 'zh-CN' ? 'fi-cn' : 'fi-us'))
 
 async function switchLanguage(code: string) {
   if (code === currentLocale.value) {
@@ -510,19 +510,18 @@ async function handleLogout() {
   color: var(--theme-default, #5A67F5);
   font-weight: 600;
 }
-.flag-icon {
-  width: 18px;
-  height: 13px;
+/* 国旗统一由 flag-icons（MIT 开源库）渲染，见 main.ts 全局引入 */
+.fi {
   border-radius: 2px;
-  display: inline-block;
-  background: linear-gradient(135deg, #de2910 33%, #ffde00 33%, #ffde00 66%, #de2910 66%);
+  vertical-align: middle;
 }
-.flag-icon.flag-cn {
-  background: linear-gradient(135deg, #de2910 33%, #ffde00 33%, #ffde00 66%, #de2910 66%);
+.lang-item .fi {
+  width: 20px;
+  height: 15px;
 }
-.flag-icon.flag-us {
-  background: linear-gradient(135deg, #3c3b6e 40%, #b22234 40%, #b22234 60%, #ffffff 60%);
-  border: 1px solid #e0e0e0;
+.lang-dropdown .fi {
+  width: 18px;
+  height: 13.5px;
 }
 .lang-txt {
   font-size: 13px;

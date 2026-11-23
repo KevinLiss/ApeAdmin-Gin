@@ -57,7 +57,7 @@ func (h *DashboardHandler) System(c *gin.Context) {
 	}
 	loadAvg := []float64{0, 0, 0}
 	if avg, err := load.Avg(); err == nil {
-		loadAvg = []float64{avg.Load1, avg.Load5, avg.Load15}
+		loadAvg = []float64{round1(avg.Load1), round1(avg.Load5), round1(avg.Load15)}
 	}
 
 	// 内存

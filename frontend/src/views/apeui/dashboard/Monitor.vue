@@ -55,7 +55,7 @@
                 </div>
                 <div class="mi-item">
                   <span class="mi-label">{{ t('dashboard.metrics.loadAvg') }}</span>
-                  <span class="mi-value">{{ (sysData.cpu?.load_avg || [0,0,0]).join(' / ') }}</span>
+                  <span class="mi-value">{{ formatLoad(sysData.cpu?.load_avg) }}</span>
                 </div>
               </div>
             </div>
@@ -358,6 +358,13 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { GaugeChart, BarChart, LineChart } from 'echarts/charts'
 import { TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
 import { Monitor, Cpu, Timer, Operation, Coin, Box, Connection, User } from '@element-plus/icons-vue'
+
+/** 负载均衡：统一保留 1 位小数（后端已 round1，此处展示层双保险），
+ *  避免原始值知 3.81689453125 把「负载均衡」标签挤成竖排。 */
+function formatLoad(arr?: number[]): string {
+  const a = arr && arr.length ? arr : [0, 0, 0]
+  return a.map((v) => Number(v ?? 0).toFixed(1)).join(' / ')
+}
 import { getDashboardSystem } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useTheme } from '@/composables/useTheme'

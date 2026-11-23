@@ -21,7 +21,7 @@
       <el-table-column :label="t('system.i18n.locale.name')" prop="name" min-width="130" />
       <el-table-column :label="t('system.i18n.locale.flag')" prop="icon" width="90">
         <template #default="{ row }">
-          <span v-if="row.icon" class="flag-icon">{{ row.icon }}</span>
+          <span v-if="flagClass(row.icon)" :class="flagClass(row.icon)"></span>
           <span v-else style="color: #909399">—</span>
         </template>
       </el-table-column>
@@ -91,7 +91,12 @@
         <el-input v-model="form.name" :placeholder="t('system.i18n.locale.namePlaceholder')" />
       </el-form-item>
       <el-form-item :label="t('system.i18n.locale.flag')">
-        <el-input v-model="form.icon" placeholder="🇨🇳 / 🇺🇸 / 🇯🇵" maxlength="8" />
+        <el-select v-model="form.icon" clearable filterable style="width: 100%">
+          <el-option v-for="o in FLAG_OPTIONS" :key="o.value" :value="o.value" :label="flagLabel(o)">
+            <span :class="'fi fi-' + o.value"></span>
+            <span style="margin-left: 8px">{{ flagLabel(o) }}（{{ o.value.toUpperCase() }}）</span>
+          </el-option>
+        </el-select>
       </el-form-item>
       <el-form-item :label="t('system.i18n.locale.isDefault')">
         <el-switch v-model="form.is_default" :active-value="1" :inactive-value="0" />
@@ -122,7 +127,50 @@ import {
   deleteI18nLocale,
 } from '@/api'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+// 国旗图标：统一存 ISO 3166-1 alpha-2 code（cn/us/...），由 flag-icons（MIT）渲染；
+// 兼容历史 emoji 数据（🇨🇳 → cn，由 regional indicator 码点转换）
+const FLAG_OPTIONS = [
+  { value: 'cn', zh: '中国', en: 'China' },
+  { value: 'us', zh: '美国', en: 'United States' },
+  { value: 'gb', zh: '英国', en: 'United Kingdom' },
+  { value: 'jp', zh: '日本', en: 'Japan' },
+  { value: 'kr', zh: '韩国', en: 'South Korea' },
+  { value: 'de', zh: '德国', en: 'Germany' },
+  { value: 'fr', zh: '法国', en: 'France' },
+  { value: 'es', zh: '西班牙', en: 'Spain' },
+  { value: 'ru', zh: '俄罗斯', en: 'Russia' },
+  { value: 'pt', zh: '葡萄牙', en: 'Portugal' },
+  { value: 'it', zh: '意大利', en: 'Italy' },
+  { value: 'sg', zh: '新加坡', en: 'Singapore' },
+]
+
+function flagLabel(o: { value: string; zh: string; en: string }) {
+  return locale.value === 'en-US' ? o.en : o.zh
+}
+
+/** icon 字段兼容两种存量：ISO code 直接用；旧 emoji 转 regional indicator → code。 */
+function flagCodeOf(icon?: string): string {
+  const s = (icon || '').trim()
+  if (/^[a-zA-Z]{2}$/.test(s)) return s.toLowerCase()
+  const regional = [...s].filter((ch) => {
+    const cp = ch.codePointAt(0) ?? 0
+    return cp >= 0x1f1e6 && cp <= 0x1f1ff
+  })
+  if (regional.length === 2) {
+    return regional
+      .map((ch) => String.fromCharCode(0x41 + ((ch.codePointAt(0) ?? 0) - 0x1f1e6)))
+      .join('')
+      .toLowerCase()
+  }
+  return ''
+}
+
+function flagClass(icon?: string): string {
+  const c = flagCodeOf(icon)
+  return c ? `fi fi-${c}` : ''
+}
 
 const list = ref<any[]>([])
 const loading = ref(false)
@@ -179,7 +227,7 @@ function openDialog(row?: any) {
     editingId.value = row.id
     form.code = row.code
     form.name = row.name
-    form.icon = row.icon || ''
+    form.icon = flagCodeOf(row.icon)  // 旧 emoji 数据自动转 code
     form.is_enabled = row.is_enabled
     form.is_default = row.is_default
     form.sort = row.sort
@@ -282,8 +330,17 @@ onMounted(fetchData)
   border-radius: 4px;
   color: #5a67f5;
 }
-.flag-icon {
-  font-size: 16px;
+/* 国旗由 flag-icons 渲染；表格/下拉内尺寸微调 */
+.el-table .fi {
+  width: 22px;
+  height: 16.5px;
+  border-radius: 2px;
+}
+.el-select-dropdown .fi {
+  width: 20px;
+  height: 15px;
+  border-radius: 2px;
+  vertical-align: -3px;
 }
 </style>
 

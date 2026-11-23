@@ -7,6 +7,8 @@ import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import '@/styles/apeui-theme.css'
 import 'vue3-verify/dist/vue3-verify.css'
+// 开源国旗图标库 flag-icons（MIT）：SVG 精灵离线内嵌，统一替换 emoji / CSS 渐变模拟国旗
+import 'flag-icons/css/flag-icons.min.css'
 
 import App from './App.vue'
 import router from './router'
