@@ -210,6 +210,7 @@ async function handleOneClickUpdate() {
       return
     }
     selectedFile.value = file
+    expectedMD5.value = String(updateInfo.value?.file_md5 || '').toLowerCase()
     errorMsg.value = ''
     await handleUpload()
   } catch (err: any) {
@@ -222,6 +223,8 @@ async function handleOneClickUpdate() {
 // ---- Upload ----
 const uploadRef = ref()
 const selectedFile = ref<File | null>(null)
+// 官网发布物的 MD5（一键更新时由 check-update 带回，服务端解包前校验）
+const expectedMD5 = ref('')
 const uploading = ref(false)
 const progress = ref(0)
 const progressStatus = ref<any>('')
@@ -235,6 +238,8 @@ function handleFileChange(file: UploadFile, files: UploadFiles) {
     files.splice(0, files.length - 1)
   }
   const raw = file.raw as UploadRawFile
+  // 手工上传：无法预知哈希，交给服务端校验（并记录实际 MD5）
+  expectedMD5.value = ''
   // Go 版只接受 .zip 部署包（与官网发布物一致）
   const name = raw.name.toLowerCase()
   if (!name.endsWith('.zip')) {
@@ -272,7 +277,7 @@ async function handleUpload() {
   successMsg.value = ''
 
   try {
-    const res: any = await uploadSystemUpdate(selectedFile.value, (pct: number) => {
+    const res: any = await uploadSystemUpdate(selectedFile.value, expectedMD5.value, (pct: number) => {
       progress.value = pct
       if (pct < 100) {
         progressText.value = t('common.versionUpdate.uploadingPercent', { pct })

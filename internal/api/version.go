@@ -2,11 +2,16 @@ package api
 
 import (
 	"archive/zip"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -111,6 +116,9 @@ func (h *VersionHandler) CheckUpdate(c *gin.Context) {
 				Description string `json:"description"`
 				Changelog   string `json:"changelog"`
 				PublishedAt string `json:"published_at"`
+				FileName    string `json:"file_name"`
+				FileSize    int64  `json:"file_size"`
+				FileMD5     string `json:"file_md5"`
 			} `json:"items"`
 		} `json:"data"`
 	}
@@ -127,6 +135,10 @@ func (h *VersionHandler) CheckUpdate(c *gin.Context) {
 	result["changelog"] = latest.Changelog
 	result["published_at"] = latest.PublishedAt
 	result["download_url"] = fmt.Sprintf("%s/api/v1/apehub-web/site/public/releases/%d/download", base, latest.ID)
+	// 完整性校验材料：前端一键更新下载后回传 file_md5，服务端据此拒绝被篡改的包
+	result["file_name"] = latest.FileName
+	result["file_size"] = latest.FileSize
+	result["file_md5"] = latest.FileMD5
 	result["has_update"] = semverGreater(latest.Version, current)
 	c.JSON(http.StatusOK, response.Success(result))
 }
@@ -211,7 +223,31 @@ func (h *VersionHandler) Update(c *gin.Context) {
 	}
 	defer os.Remove(tmpZip)
 
-	// 3. 安全解包（穿越/炸弹防护），解到临时目录
+	// 3. 完整性校验：一键更新路径由前端回传官网 file_md5，先验哈希再解包
+	actualMD5, err := fileMD5(tmpZip)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.ErrorCtx(c, 500, "version.save_fail", nil))
+		return
+	}
+	expectedMD5 := strings.ToLower(strings.TrimSpace(c.PostForm("expected_md5")))
+	md5Verified := false
+	if expectedMD5 != "" {
+		if !isMD5Hex(expectedMD5) {
+			c.JSON(http.StatusBadRequest, response.Error(400, "expected_md5 格式非法（应为 32 位十六进制）"))
+			return
+		}
+		if expectedMD5 != actualMD5 {
+			c.JSON(http.StatusBadRequest, response.Error(400,
+				"更新包完整性校验失败：MD5 不一致，已中止更新（上传包 MD5="+actualMD5+"）"))
+			return
+		}
+		md5Verified = true
+	} else {
+		// 手工上传自建包无法预知哈希：记录实际值便于事后审计，不阻断
+		log.Printf("[UPDATE] 未提供 expected_md5，跳过哈希校验（uploaded md5=%s, size=%d）", actualMD5, file.Size)
+	}
+
+	// 4. 安全解包（穿越/炸弹防护），解到临时目录
 	stageDir := filepath.Join(tmpDir, fmt.Sprintf("stage-%d", time.Now().UnixNano()))
 	defer os.RemoveAll(stageDir)
 	if err := safeUnzip(tmpZip, stageDir); err != nil {
@@ -219,14 +255,21 @@ func (h *VersionHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// 4. 定位包内的有效载荷（deploy 包直含 frontend/dist；src 包内嵌 release-package/）
+	// 5. 定位包内的有效载荷（deploy 包直含 frontend/dist；src 包内嵌 release-package/）
 	spaDir, binDir, newVersion, err := locatePayload(stageDir)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.Error(400, err.Error()))
 		return
 	}
 
-	// 5. 备份现有 dist + 二进制
+	// 5.1 防降级：拒绝用旧版本包覆盖当前实例（同时挡住"用旧包回滚绕过校验"）
+	if newVersion != "" && semverGreater(cfg.App.Version, newVersion) {
+		c.JSON(http.StatusBadRequest, response.Error(400,
+			fmt.Sprintf("不允许降级：当前 %s，包内 %s", cfg.App.Version, newVersion)))
+		return
+	}
+
+	// 6. 备份现有 dist + 二进制
 	workDir := workingDir()
 	bakDir := filepath.Join(workDir, "uploads", "version-backup", time.Now().Format("20060102-150405"))
 	exePath, exeErr := os.Executable()
@@ -235,7 +278,7 @@ func (h *VersionHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// 6. 替换：前端 dist 先行（不影响运行中进程），二进制最后替换
+	// 7. 替换：前端 dist 先行（不影响运行中进程），二进制最后替换
 	if err := replaceDir(spaDir, cfg.App.SPADir); err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error(400, "更新前端失败: "+err.Error()))
 		return
@@ -254,7 +297,7 @@ func (h *VersionHandler) Update(c *gin.Context) {
 		_ = patchLocalConfigVersion(filepath.Join(workDir, "configs", "config.yaml"), newVersion)
 	}
 
-	// 7. 触发优雅停机（由守护进程拉起新进程；裸进程部署则需手动重启）
+	// 8. 触发优雅停机（由守护进程拉起新进程；裸进程部署则需手动重启）
 	go func() {
 		time.Sleep(500 * time.Millisecond) // 等响应送达客户端
 		core.RequestShutdown()
@@ -266,11 +309,44 @@ func (h *VersionHandler) Update(c *gin.Context) {
 		"new_version":   newVersion,
 		"backup_dir":    bakDir,
 		"binary_update": binDir != "",
+		"file_md5":      actualMD5,
+		"md5_verified":  md5Verified,
 	}))
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // 内部工具
+
+// md5HexPattern 32 位小写十六进制
+var md5HexPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
+// isMD5Hex 校验 MD5 字符串格式
+func isMD5Hex(s string) bool { return md5HexPattern.MatchString(s) }
+
+// fileMD5 计算文件 MD5（十六进制小写）
+func fileMD5(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// isVersionKeyLine 判断是否为 config.yaml 中的 version 键行
+// （用完整键比较，避免 version_xxx 之类前缀误匹配）
+func isVersionKeyLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	rest, ok := strings.CutPrefix(trimmed, "version")
+	if !ok {
+		return false
+	}
+	return strings.HasPrefix(rest, ":")
+}
 
 // workingDir 工作目录（配置相对路径的基准）
 func workingDir() string {
@@ -371,9 +447,9 @@ func locatePayload(stage string) (spaDir string, binDir string, version string, 
 		if st, e := os.Stat(dist); e == nil && st.IsDir() {
 			spa = dist
 		}
-		bin = filepath.Join(root, "bin")
-		if st, e := os.Stat(bin); e == nil && st.IsDir() {
-			bin = bin
+		binDir := filepath.Join(root, "bin")
+		if st, e := os.Stat(binDir); e == nil && st.IsDir() {
+			bin = binDir
 		} else {
 			bin = ""
 		}
@@ -405,7 +481,7 @@ func readVersionFromConfig(path string) (string, error) {
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "version:") {
+		if isVersionKeyLine(line) {
 			v := strings.Trim(strings.TrimPrefix(line, "version:"), ` "'`)
 			if v != "" {
 				return v, nil
@@ -425,7 +501,7 @@ func patchLocalConfigVersion(path, newVersion string) error {
 	lines := strings.Split(string(data), "\n")
 	patched := false
 	for i, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "version:") {
+		if isVersionKeyLine(line) {
 			indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
 			lines[i] = indent + "version: " + strconv.Quote(newVersion)
 			patched = true

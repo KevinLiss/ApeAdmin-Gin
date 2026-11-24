@@ -230,10 +230,14 @@ func (h *AiHandler) ActiveChatRun(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, response.Success(getActiveChatRunState(uint(sessionID64), userID)))
 }
+
 // streamRunEventsByPolling 跨实例订阅降级：本机无 RunBuffer 时按落库状态推流。
 // 语义与缓冲模式一致（snapshot / run_start / content / run_end），供前端同一套处理。
 func streamRunEventsByPolling(c *gin.Context, flusher http.Flusher, send func(interface{}), run *model.SysChatRun) {
 	db := core.GetDB()
+	// 最大订阅时长兜底：跨实例轮询依赖对端心跳，若对端实例已崩溃且暂未被回收，
+	// 这里必须主动退出，避免连接被无限占用（H1 的回收器另有一层保护）。
+	deadline := time.Now().Add(runPollingMaxDuration)
 	// 初始快照（以 DB 为准）
 	state := runStateFromModel(run)
 	state["question"] = run.Question
@@ -253,6 +257,12 @@ func streamRunEventsByPolling(c *gin.Context, flusher http.Flusher, send func(in
 			return
 		case <-ticker.C:
 		}
+		if time.Now().After(deadline) {
+			send(map[string]interface{}{"type": "run_end", "status": "failed",
+				"error": "订阅超时，请刷新页面查看任务状态"})
+			return
+		}
+
 		var cur model.SysChatRun
 		if err := db.First(&cur, run.ID).Error; err != nil {
 			return // run 被删除（会话删除）

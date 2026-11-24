@@ -205,9 +205,15 @@ export const updateSetting = (key: string, value: string) => request.put(`/setti
 // ---- 系统版本与更新 ----
 export const getSystemVersion = () => request.get('/system/version')
 export const checkSystemUpdate = () => request.get('/system/check-update')
-export const uploadSystemUpdate = (file: File, onProgress?: (percent: number) => void) => {
+// expectedMd5：官网发布物的 file_md5，服务端解包前校验，防被篡改的更新包
+export const uploadSystemUpdate = (
+  file: File,
+  expectedMd5?: string,
+  onProgress?: (percent: number) => void,
+) => {
   const formData = new FormData()
   formData.append('file', file)
+  if (expectedMd5) formData.append('expected_md5', expectedMd5)
   return request.post('/system/update', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 300000, // 5 min timeout for large packages

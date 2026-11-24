@@ -20,7 +20,7 @@ database:
   max_open_conns: 50
   max_idle_conns: 10
   log_level: warn           # silent | error | warn | info
-  auto_migrate: true        # 仅开发/首启用；生产必须 false 并走 golang-migrate（见 14.5）
+  auto_migrate: true        # 仅开发/首启用；生产建议 false，启动时自动执行内置版本化迁移（internal/core/migrations）
 
 redis:                        # 多实例部署的共享层（token 黑名单/权限缓存）；单实例可保持关闭
   url: "redis://localhost:6379/1"

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"apeadmin-gin/internal/config"
 	"apeadmin-gin/internal/middleware"
 	"apeadmin-gin/internal/pkg/response"
+	"github.com/gin-gonic/gin"
 )
 
 // PluginRouteRegistrar 插件路由注册回调
@@ -28,9 +28,10 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 	// MCP 对外网关（Streamable HTTP：外部 MCP 客户端经 OAuth/登录 token 接入）
 	mcpGw := &McpHandler{}
 	mcpAuth := middleware.MCPAuth()
-	r.POST("/mcp", mcpAuth, middleware.RateLimit("mcp", 120, time.Minute), mcpGw.MCPGateway)
-	r.GET("/mcp", mcpAuth, mcpGw.MCPGateway)
-	r.DELETE("/mcp", mcpAuth, mcpGw.MCPGateway)
+	// MCPOriginGuard 先于鉴权：Origin 未授权的浏览器请求直接 403（防 DNS rebinding）
+	r.POST("/mcp", middleware.MCPOriginGuard(), mcpAuth, middleware.RateLimit("mcp", 120, time.Minute), mcpGw.MCPGateway)
+	r.GET("/mcp", middleware.MCPOriginGuard(), mcpAuth, mcpGw.MCPGateway)
+	r.DELETE("/mcp", middleware.MCPOriginGuard(), mcpAuth, mcpGw.MCPGateway)
 
 	// 语言解析（全局，后端消息翻译用）
 	r.Use(middleware.Locale())
@@ -62,7 +63,13 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 		oauth := public.Group("/oauth")
 		oauth.POST("/register", middleware.RateLimit("oauth-register", 5, time.Minute), OAuthRegister)
 		oauth.GET("/authorize", OAuthAuthorize)
-		oauth.POST("/authorize/consent", middleware.RateLimit("oauth-consent", 10, time.Minute), OAuthAuthorizeConsent)
+		oauth.POST("/authorize/consent",
+			// LoginGuard：同意页是第二个密码校验入口，必须与 /auth/login 共享
+			// IP+用户名 失败计数与锁定，否则可绕过登录防爆破直接在此爆破
+			middleware.LoginGuard(),
+			middleware.RateLimit("oauth-consent", 10, time.Minute),
+			OAuthAuthorizeConsent,
+		)
 		oauth.POST("/token", middleware.RateLimit("oauth-token", 30, time.Minute), OAuthToken)
 
 		// i18n 公开接口（登录页/前端启动即用）
@@ -252,11 +259,11 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, registerPlugins PluginRou
 			})
 			// SPA fallback：非 API 路径返回 index.html
 			r.NoRoute(func(c *gin.Context) {
-			if strings.HasPrefix(c.Request.URL.Path, cfg.App.APIPrefix) ||
-				strings.HasPrefix(c.Request.URL.Path, "/health") {
-				c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "common.api_not_found", nil))
-				return
-			}
+				if strings.HasPrefix(c.Request.URL.Path, cfg.App.APIPrefix) ||
+					strings.HasPrefix(c.Request.URL.Path, "/health") {
+					c.JSON(http.StatusNotFound, response.ErrorCtx(c, 404, "common.api_not_found", nil))
+					return
+				}
 				c.File(filepath.Join(cfg.App.SPADir, "index.html"))
 			})
 		} else {

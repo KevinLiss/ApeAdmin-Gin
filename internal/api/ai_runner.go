@@ -32,9 +32,13 @@ const (
 	runBufferTTL       = 10 * time.Minute       // 终态缓冲保留时长（供迟到订阅者取快照）
 	runMaxToolRounds   = 5                      // 工具循环上限
 
-	runClaimStale   = 90 * time.Second // 领取心跳超时阈值：超过视为执行实例已死
-	runHeartbeat    = 15 * time.Second // 执行中心跳间隔
-	runClaimerEvery = 500 * time.Millisecond // 全局领取器扫描间隔
+	runClaimStale     = 90 * time.Second       // 领取心跳超时阈值：超过视为执行实例已死
+	runHeartbeat      = 15 * time.Second       // 执行中心跳间隔
+	runClaimerEvery   = 500 * time.Millisecond // 全局领取器扫描间隔
+	runStaleScanEvery = 20                     // 每 N 次领取器 tick 扫一次心跳超时的 running（≈10s）
+	runStaleErr       = "执行实例失联，本轮中断，请重新发送"
+	// runPollingMaxDuration 跨实例轮询订阅的最大时长（兜底，防对端崩溃后连接悬挂）
+	runPollingMaxDuration = 10 * time.Minute
 )
 
 var runTerminalStatuses = map[string]bool{"done": true, "failed": true, "stopped": true}
@@ -56,7 +60,7 @@ type RunBuffer struct {
 	answer          string
 	toolEvents      []map[string]interface{}
 	errMsg          string
-	events          []string    // 已序列化的 SSE payload，下标即偏移量
+	events          []string      // 已序列化的 SSE payload，下标即偏移量
 	notify          chan struct{} // 广播通道：publish 时关闭并替换
 	cancelRequested bool
 	lastFlush       time.Time
@@ -187,18 +191,26 @@ func releaseOwnPendingClaims() {
 		Updates(map[string]interface{}{"claimed_by": "", "claimed_at": nil})
 }
 
-// StartRunClaimer 全局领取器：周期扫描未被认领/心跳超时的 pending run 并抢占执行。
+// StartRunClaimer 全局领取器：周期扫描未被认领/心跳超时的 pending run 并抢占执行，
+// 同时回收心跳超时的 running run（执行实例崩溃/被 OOM kill 后无人收尾）。
 // 多实例部署的兜底接管路径（入队实例的 fast path 是 enqueue→startSessionWorker）。
 func StartRunClaimer(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(runClaimerEvery)
 		defer ticker.Stop()
+		tick := 0
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
 			}
+			tick++
+			// running 回收扫描频率低于 pending 领取（成本更高且 90s 阈值不需要 500ms 精度）
+			if tick%runStaleScanEvery == 0 {
+				recycleStaleRunningRuns(ctx)
+			}
+
 			var runs []model.SysChatRun
 			core.GetDB().Where("status = 'pending' AND (claimed_by = '' OR claimed_by IS NULL OR claimed_at IS NULL OR claimed_at < ?)",
 				runClaimStaleAt()).Order("id ASC").Limit(10).Find(&runs)
@@ -212,6 +224,72 @@ func StartRunClaimer(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+// recycleStaleRunningRuns 回收心跳超时的 running run（执行实例已失联）。
+//
+// 此前只有启动时 RecoverChatRuns 能收尾，多实例部署下某实例崩溃后，
+// 该 run 永久卡在 running：SSE 订阅端无限轮询，会话也永远无法继续。
+// 现在由全局领取器周期补偿。
+//
+// 并发安全：以 status='running' + 心跳超时 作为条件更新，多实例同时扫描时
+// 只有 RowsAffected=1 的实例执行收尾（补消息/广播/拉起 worker），不会重复。
+func recycleStaleRunningRuns(ctx context.Context) int {
+	db := core.GetDB()
+	var stale []model.SysChatRun
+	db.Where("status = 'running' AND (claimed_by = '' OR claimed_by IS NULL OR claimed_at IS NULL OR claimed_at < ?)",
+		runClaimStaleAt()).Order("id ASC").Limit(20).Find(&stale)
+
+	n := 0
+	for i := range stale {
+		if ctx.Err() != nil {
+			return n
+		}
+		r := stale[i]
+		now := time.Now()
+		res := db.Model(&model.SysChatRun{}).
+			Where("id = ? AND status = 'running'", r.ID).
+			Updates(map[string]interface{}{
+				"status":      "failed",
+				"error":       runStaleErr,
+				"finished_at": now,
+				"claimed_by":  "",
+			})
+		if res.Error != nil || res.RowsAffected == 0 {
+			continue
+		}
+		n++
+
+		// 已生成的部分内容落为 assistant 消息，避免用户刷新会话后内容凭空消失
+		if strings.TrimSpace(r.Answer) != "" {
+			db.Create(&model.SysChatMessage{
+				SessionID:  r.SessionID,
+				Role:       "assistant",
+				Content:    r.Answer,
+				ToolEvents: r.ToolEvents,
+			})
+		}
+
+		// 本机残留缓冲（进程假死但未真正退出）收尾并通知订阅者立即退出轮询
+		if buf := getRunBuffer(r.ID); buf != nil {
+			buf.mu.Lock()
+			buf.status = "failed"
+			buf.errMsg = runStaleErr
+			buf.mu.Unlock()
+			buf.publish(map[string]interface{}{"type": "run_end", "status": "failed", "error": runStaleErr})
+			runID := r.ID
+			time.AfterFunc(runBufferTTL, func() { removeRunBuffer(runID) })
+		}
+
+		// 该会话可能还有 pending 排队任务，有才拉起 worker（避免空转 goroutine）
+		var pending int64
+		db.Model(&model.SysChatRun{}).
+			Where("session_id = ? AND status = ?", r.SessionID, "pending").Count(&pending)
+		if pending > 0 {
+			startSessionWorker(r.SessionID)
+		}
+	}
+	return n
 }
 
 // startSessionWorker 确保会话有且仅有一个 worker（幂等）

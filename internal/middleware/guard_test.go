@@ -169,6 +169,79 @@ func TestLoginGuardIsolatesUsers(t *testing.T) {
 	}
 }
 
+// OAuth 同意页成功时返回 302 而非 200，计数同样必须被清零
+func TestLoginGuardClearsOnRedirect(t *testing.T) {
+	resetGuardRecords()
+	core.SetConfig(guardTestConfig())
+	t.Cleanup(func() { core.ResetTest() })
+
+	r := newTestRouter()
+	r.POST("/consent", LoginGuard(), func(c *gin.Context) {
+		if c.PostForm("password") == "right" {
+			c.Redirect(http.StatusFound, "https://example.com/cb")
+			return
+		}
+		c.String(http.StatusUnauthorized, "bad creds")
+	})
+
+	ip := "10.0.0.4"
+	// 先制造 2 次失败（未达阈值 3）
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/consent", strings.NewReader("username=dave&password=wrong"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip + ":1"
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: %d", i+1, w.Code)
+		}
+	}
+	// 成功（302）后记录应被清除
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/consent", strings.NewReader("username=dave&password=right"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.RemoteAddr = ip + ":1"
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusFound {
+		t.Fatalf("success code = %d, want 302", w.Code)
+	}
+	lgMu.Lock()
+	_, exists := lgRecords[ip+"|dave"]
+	lgMu.Unlock()
+	if exists {
+		t.Fatal("302 成功响应必须清除登录防护记录")
+	}
+}
+
+func TestLoginGuardLocksConsentEntry(t *testing.T) {
+	resetGuardRecords()
+	core.SetConfig(guardTestConfig())
+	t.Cleanup(func() { core.ResetTest() })
+
+	r := newTestRouter()
+	r.POST("/consent", LoginGuard(), func(c *gin.Context) {
+		c.String(http.StatusUnauthorized, "bad creds")
+	})
+
+	ip := "10.0.0.5"
+	for i := 0; i < 3; i++ {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/consent", strings.NewReader("username=erin&password=x"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip + ":1"
+		r.ServeHTTP(w, req)
+	}
+	// 第 4 次在进入 handler 前即被 429 拦截（同意页不能再作为爆破旁路）
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/consent", strings.NewReader("username=erin&password=x"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.RemoteAddr = ip + ":1"
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("locked consent: code = %d, want 429", w.Code)
+	}
+}
+
 func TestLoginGuardResetsOnSuccess(t *testing.T) {
 	resetGuardRecords()
 	core.SetConfig(guardTestConfig())

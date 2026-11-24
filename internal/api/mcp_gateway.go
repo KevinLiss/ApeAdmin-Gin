@@ -26,6 +26,7 @@ import (
 
 // MCPGateway POST/GET/DELETE /mcp
 func (h *McpHandler) MCPGateway(c *gin.Context) {
+	// Origin 校验见 middleware.MCPOriginGuard（路由层，先于鉴权执行）
 	switch c.Request.Method {
 	case http.MethodPost:
 		h.mcpHandlePost(c)

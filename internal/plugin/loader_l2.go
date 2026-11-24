@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"apeadmin-gin/internal/dal"
 	"apeadmin-gin/internal/model"
+	"apeadmin-gin/internal/pkg/utils"
 
 	"gorm.io/gorm"
 )
@@ -146,7 +148,12 @@ func injectMenus(tx *gorm.DB, menuPath string) error {
 	return nil
 }
 
-// injectSeedSQL 执行预置 SQL
+// allowedSeedVerbs seed.sql 允许的语句首词。
+// 声明式插件（L2）承诺「只能添加数据/建表」，不能修改或删除既有数据；
+// 此前直接 tx.Exec(整个 seed.sql) 等于把任意 DDL/DML 执行权交给插件包。
+var allowedSeedVerbs = []string{"INSERT", "CREATE"}
+
+// injectSeedSQL 执行预置 SQL（逐条校验后再执行）
 func injectSeedSQL(tx *gorm.DB, seedPath string) error {
 	data, err := os.ReadFile(seedPath)
 	if err != nil {
@@ -155,7 +162,42 @@ func injectSeedSQL(tx *gorm.DB, seedPath string) error {
 	if len(data) == 0 {
 		return nil
 	}
-	return tx.Exec(string(data)).Error
+	stmts, err := utils.SplitSQLStatements(string(data))
+	if err != nil {
+		return err
+	}
+	for i, stmt := range stmts {
+		if err := validateSeedStatement(stmt); err != nil {
+			return fmt.Errorf("seed.sql 第 %d 条语句被拒绝: %w", i+1, err)
+		}
+	}
+	for _, stmt := range stmts {
+		if err := tx.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateSeedStatement 校验单条语句的首词是否在白名单内（要求词边界，防 INSERTX 绕过）。
+func validateSeedStatement(stmt string) error {
+	upper := strings.ToUpper(strings.TrimSpace(stmt))
+	for _, verb := range allowedSeedVerbs {
+		if !strings.HasPrefix(upper, verb) {
+			continue
+		}
+		if len(upper) == len(verb) {
+			return nil
+		}
+		if strings.ContainsRune(" \t\r\n(", rune(upper[len(verb)])) {
+			return nil
+		}
+	}
+	firstWord := upper
+	if idx := strings.IndexAny(firstWord, " \t\r\n("); idx > 0 {
+		firstWord = firstWord[:idx]
+	}
+	return fmt.Errorf("仅允许 %s 语句，实际为 %q", strings.Join(allowedSeedVerbs, " / "), firstWord)
 }
 
 // containsFile 检查文件列表中是否包含指定文件

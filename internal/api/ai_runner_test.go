@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -196,5 +197,65 @@ func TestBuildRunContextWindowLimit(t *testing.T) {
 	}
 	if msgs[len(msgs)-1]["content"] != "最新问题" {
 		t.Fatalf("last message must be current question")
+	}
+}
+
+// ─── 失效 running run 回收（H1）───
+
+func TestRecycleStaleRunningRun(t *testing.T) {
+	setupRunnerTestDB(t)
+	db := core.GetDB()
+	stale := time.Now().Add(-3 * time.Minute)
+	run := model.SysChatRun{
+		SessionID: 9, UserID: 1, Status: "running", Question: "q",
+		Answer: "部分内容", ClaimedBy: "dead-instance", ClaimedAt: &stale,
+	}
+	db.Create(&run)
+
+	n := recycleStaleRunningRuns(context.Background())
+	if n != 1 {
+		t.Fatalf("recycled = %d, want 1", n)
+	}
+
+	var got model.SysChatRun
+	db.First(&got, run.ID)
+	if got.Status != "failed" {
+		t.Fatalf("status = %s, want failed", got.Status)
+	}
+	if got.Error != runStaleErr {
+		t.Fatalf("error = %q", got.Error)
+	}
+	if got.FinishedAt == nil {
+		t.Fatal("finished_at 未写入")
+	}
+	if got.ClaimedBy != "" {
+		t.Fatalf("claimed_by = %q, want cleared", got.ClaimedBy)
+	}
+
+	// 已生成的部分内容必须落为 assistant 消息，刷新会话不丢内容
+	var msgs []model.SysChatMessage
+	db.Where("session_id = ? AND role = ?", 9, "assistant").Find(&msgs)
+	if len(msgs) != 1 || msgs[0].Content != "部分内容" {
+		t.Fatalf("assistant messages = %#v", msgs)
+	}
+}
+
+func TestRecycleSkipsFreshRunningRun(t *testing.T) {
+	setupRunnerTestDB(t)
+	db := core.GetDB()
+	fresh := time.Now()
+	run := model.SysChatRun{
+		SessionID: 1, UserID: 1, Status: "running", Question: "q",
+		ClaimedBy: "alive-instance", ClaimedAt: &fresh,
+	}
+	db.Create(&run)
+
+	if n := recycleStaleRunningRuns(context.Background()); n != 0 {
+		t.Fatalf("recycled = %d, want 0（心跳新鲜的 run 不得误杀）", n)
+	}
+	var got model.SysChatRun
+	db.First(&got, run.ID)
+	if got.Status != "running" {
+		t.Fatalf("status = %s, want running", got.Status)
 	}
 }

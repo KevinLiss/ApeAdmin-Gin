@@ -122,3 +122,74 @@ func indexOf(s, sub string) int {
 	}
 	return -1
 }
+
+// ─── 更新包完整性校验 ───
+
+func TestFileMD5MatchesKnownHash(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "pkg.bin")
+	if err := os.WriteFile(path, []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := fileMD5(path)
+	if err != nil {
+		t.Fatalf("fileMD5: %v", err)
+	}
+	// md5("hello") = 5d41402abc4b2a76b9719d911017c592
+	if got != "5d41402abc4b2a76b9719d911017c592" {
+		t.Fatalf("md5 = %s", got)
+	}
+}
+
+func TestIsMD5Hex(t *testing.T) {
+	if !isMD5Hex("916e5cf4c00fd81946a718b5c42d9614") {
+		t.Fatal("合法 MD5 被拒")
+	}
+	for _, s := range []string{"", "abc", "916E5CF4C00FD81946A718B5C42D9614", "zzze5cf4c00fd81946a718b5c42d9614"} {
+		if isMD5Hex(s) {
+			t.Fatalf("%q 不应被当作合法 MD5", s)
+		}
+	}
+}
+
+func TestFileMD5MissingFile(t *testing.T) {
+	if _, err := fileMD5(filepath.Join(t.TempDir(), "nope")); err == nil {
+		t.Fatal("missing file must error")
+	}
+}
+
+// ─── version 键精确匹配（防 version_xxx 前缀误伤）───
+
+func TestIsVersionKeyLine(t *testing.T) {
+	good := []string{`version: "1.0"`, "  version: 1.0", "\tversion: x"}
+	for _, line := range good {
+		if !isVersionKeyLine(line) {
+			t.Fatalf("%q 应识别为 version 键", line)
+		}
+	}
+	bad := []string{"version_extra: 1", "versions: []", "# version: 1.0", "app_version: 2"}
+	for _, line := range bad {
+		if isVersionKeyLine(line) {
+			t.Fatalf("%q 不应识别为 version 键", line)
+		}
+	}
+}
+
+func TestPatchLocalConfigVersionIgnoresSimilarKeys(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	content := "app:\n  version_check: \"on\"\n  version: \"0.4.0\"\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := patchLocalConfigVersion(path, "0.4.2"); err != nil {
+		t.Fatalf("patch: %v", err)
+	}
+	out, _ := os.ReadFile(path)
+	s := string(out)
+	if !contains(s, `version_check: "on"`) {
+		t.Fatalf("相似键被误改:\n%s", s)
+	}
+	if !contains(s, `version: "0.4.2"`) {
+		t.Fatalf("版本未更新:\n%s", s)
+	}
+}

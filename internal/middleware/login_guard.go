@@ -9,15 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"apeadmin-gin/internal/core"
 	"apeadmin-gin/internal/pkg/response"
+	"github.com/gin-gonic/gin"
 )
 
 // loginGuardEntry 登录失败记录
 type loginGuardEntry struct {
-	attempts  int
-	firstFail time.Time
+	attempts    int
+	firstFail   time.Time
 	lockedUntil time.Time
 }
 
@@ -91,8 +91,10 @@ func LoginGuard() gin.HandlerFunc {
 				entry.attempts = 0
 			}
 			lgMu.Unlock()
-		} else if c.Writer.Status() == http.StatusOK {
-			// 登录成功，清除记录
+		} else if s := c.Writer.Status(); s >= http.StatusOK && s < http.StatusBadRequest {
+			// 认证成功，清除记录。
+			// 覆盖 200（JSON 登录）与 3xx（OAuth consent 成功后 302 回调——
+			// 该入口复用本中间件阻断密码爆破，不能因非 200 而漏清计数）。
 			lgMu.Lock()
 			delete(lgRecords, key)
 			lgMu.Unlock()
