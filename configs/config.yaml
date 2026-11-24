@@ -3,7 +3,7 @@
 
 app:
   name: "ApeAdmin"
-  version: "0.4.1"
+  version: "0.4.2"
   debug: true
   api_prefix: "/api/v1"
   admin_path: "/admin"
